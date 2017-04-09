@@ -8,7 +8,7 @@ module Regex where
 import Prelude
 
 import Data.Set (Set)
-import qualified Data.Set as Set (singleton, fromList, member, delete)
+import qualified Data.Set as Set (singleton, fromList, toList, member, delete)
 
 import Data.Generics
 
@@ -24,13 +24,14 @@ import qualified Language.Haskell.TH as TH
 import Language.Haskell.TH.Syntax
 import Language.Haskell.TH.Quote
 
+--TODO: marked subexpressions
+
 data RegExp = Char (Set Char)      -- single literal character
             | Alt RegExp RegExp    -- r1 | r2   (alternation)
             | Seq RegExp RegExp    -- r1 r2     (concatenation)
             | Star RegExp          -- r*        (Kleene star)
             | Empty                -- ε, accepts empty string
             | Void                 -- ∅, always fails
-            | Mark String RegExp   -- for marked subexpressions
             | Var String           -- a variable holding another regexp
   deriving (Show, Eq)
 
@@ -70,8 +71,8 @@ regexParser = alts <* eof where
                  P.<|> atom
   specials   = "[]()*|"
 
-instance Lift a => Lift (Set a) where
-  lift set = appE (varE `Set.fromList) (lift (Set.toList set))
+instance Lift a => Lift (Set a) where 
+  lift set = TH.appE (TH.varE 'Set.fromList) (lift (Set.toList set))
 
 instance Lift RegExp where
   -- lift :: RegExp -> Q Exp

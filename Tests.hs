@@ -1,5 +1,5 @@
 {-# OPTIONS -fwarn-incomplete-patterns -fwarn-tabs #-}
-{-# LANGUAGE NoImplicitPrelude, FlexibleInstances, ScopedTypeVariables #-}
+{-# LANGUAGE NoImplicitPrelude, FlexibleInstances, ScopedTypeVariables, TemplateHaskell, QuasiQuotes #-}
 
 module Tests where
 
