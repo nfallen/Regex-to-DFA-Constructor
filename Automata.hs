@@ -7,6 +7,8 @@ import Data.Map (Map)
 import qualified Data.Map as Map 
 import Regex
 
+import Test.HUnit (Test(..), (~:), (~?=), runTestTT, assertBool) 
+
 type State = Int
 
 type Dtransition = Map (State, Char) State
@@ -40,3 +42,19 @@ stateBijections s1 s2 = let m = Map.empty
                             xs = Map.keys s1 
                             perms = List.permutations (Map.keys s2) in 
                             fmap (\(x,y) -> Map.insert x y m) $ concat $ fmap (\perm -> zip xs perm) perms
+
+testBijections :: Test
+testBijections = "bijections" ~: 
+  let states1 = Map.fromList [(1, True),(2, False),(3, True)] in
+  let states2 = Map.fromList [(4, True),(5, False),(6, True)] in
+    TestList[
+        stateBijections states1 states2 ~?= [Map.fromList [(1,4),(2,5),(3,6)], 
+                                             Map.fromList [(1,5),(2,6),(3,4)],
+                                             Map.fromList [(1,6),(2,4),(3,5)]]
+    ] 
+
+main :: IO ()
+main = do
+    runTestTT $ TestList [testBijections]
+    return ()
+

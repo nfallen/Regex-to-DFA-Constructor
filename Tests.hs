@@ -13,3 +13,4 @@ validDotComMail'' = [regex|${plus chars}@${plus chars}.com|]
  
 plus :: RegExp -> RegExp
 plus r = Seq r (Star r)
+
