@@ -14,6 +14,8 @@ import qualified Data.Map as Map
 
 import Test.HUnit (Test(..), (~:), (~?=), runTestTT, assertBool) 
 
+-- TODO: limit exports
+
 type State = Int
 
 type Dtransition = Map (State, Char) State
