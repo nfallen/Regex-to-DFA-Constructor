@@ -22,9 +22,10 @@ singleCharThompson ab char = let singleStates = Map.insert 1 True (Map.singleton
 unionThompson :: Set Char -> RegExp -> NFA
 unionThompson ab (Alt r1 r2) = let n1 = thompsonConstruction r1 in
                                let n2 = thompsonConstruction r2 in
-                                    let unionStates = Map.union (Map.mapKeys (+1) (nstates n1)) (Map.mapKeys (+ (Map.size (nstates n1) - 1)) (nstates n2)) in -- add new start and finish
-                                    let unionTransition = Map.union (Map.mapKeys (\(a,b) -> (a + 1,b)) (ntransition n1)) (Map.mapKeys (\(a,b) -> (a + Map.size (ntransition n1) - 1,b)) (ntransition n2)) in --add new start finish transitions
-                                        NFA {nstart = 0, nstates = unionStates, ntransition = unionTransition, nalphabet = ab}
+                                      let firstUnion = Map.union (Map.union (Map.mapKeys (+1) (nstates n1)) (Map.mapKeys (+ (Map.size (nstates n1) - 1)) (nstates n2))) (Map.singleton 0 False) in
+                                        let unionStates = Map.union firstUnion (Map.singleton  ((Map.size firstUnion) - 1) True)  in -- add new start and finish
+                                        let unionTransition = Map.union (Map.mapKeys (\(a,b) -> (a + 1,b)) (ntransition n1)) (Map.mapKeys (\(a,b) -> (a + Map.size (ntransition n1) - 1,b)) (ntransition n2)) in --add new start finish transitions
+                                            NFA {nstart = 0, nstates = unionStates, ntransition = unionTransition, nalphabet = ab}
 
 
 
