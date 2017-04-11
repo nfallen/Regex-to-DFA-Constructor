@@ -7,8 +7,8 @@ module Regex where
 
 import Prelude
 
-import Data.Set (Set)
-import qualified Data.Set as Set (singleton, fromList, toList, member, delete)
+import Data.Set.Monad (Set)
+import qualified Data.Set.Monad as Set (singleton, fromList, toList, member, delete)
 
 import Data.Generics
 
@@ -71,7 +71,7 @@ regexParser = alts <* eof where
                  P.<|> atom
   specials   = "[]()*|"
 
-instance Lift a => Lift (Set a) where 
+instance (Ord a, Lift a) => Lift (Set a) where 
   lift set = TH.appE (TH.varE 'Set.fromList) (lift (Set.toList set))
 
 instance Lift RegExp where

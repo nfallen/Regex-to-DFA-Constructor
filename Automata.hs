@@ -4,10 +4,14 @@
 
 module Automata where
 
+import Control.Monad
+
+import Data.Maybe
+
 import Data.List as List
 
-import Data.Set (Set)
-import qualified Data.Set as Set
+import Data.Set.Monad (Set)
+import qualified Data.Set.Monad as Set
 
 import Data.Map (Map)
 import qualified Data.Map as Map 
@@ -26,17 +30,83 @@ type Ntransition = Map (State, Maybe Char) (Set State)
 
 type States = Map State Bool
 
-data DFA = DFA {dstart :: State, dstates :: States, dtransition :: Dtransition, dalphabet :: Set Char}
+data NFA = NFA {
+                 nstart :: State,
+                 nstates :: States,
+                 ntransition :: Ntransition,
+                 nalphabet :: Set Char
+               } deriving (Show)
 
-data NFA = NFA {nstart :: State, nstates :: States, ntransition :: Ntransition, nalphabet :: Set Char}
+data DFA = DFA {
+                 dstart :: State, 
+                 dstates :: States, 
+                 dtransition :: Dtransition, 
+                 dalphabet :: Set Char
+               } deriving (Show)
 
 -- DFA that accepts all strings
-acceptDFA :: Set Char -> DFA
-acceptDFA ab = DFA {dstart = 0, dstates = Map.singleton 0 True, dtransition = Map.empty, dalphabet = ab}
+sigmaStarDFA :: Set Char -> DFA
+sigmaStarDFA ab = DFA {dstart = 0, dstates = Map.singleton 0 True, dtransition = Map.empty, dalphabet = ab}
 
 -- DFA that rejects all strings
-rejectDFA :: Set Char -> DFA
-rejectDFA ab = DFA {dstart = 0, dstates = Map.singleton 0 False, dtransition = Map.empty, dalphabet = ab}
+emptySetDFA :: Set Char -> DFA
+emptySetDFA ab = DFA {dstart = 0, dstates = Map.singleton 0 False, dtransition = Map.empty, dalphabet = ab}
+
+-- DFA that accepts only the empty string
+emptyStringDFA :: Set Char -> DFA
+emptyStringDFA ab = DFA {dstart = 0, 
+                         dstates = Map.fromList [(0,True),(1,False)],
+                         dtransition = Map.fromList [((0,s),1) | s <- Set.toList ab],
+                         dalphabet = ab}
+
+class Automata a where
+  decideString :: a -> String -> Maybe Bool
+
+instance Automata DFA where
+  decideString dfa s = decideStringFromState dfa s (dstart dfa) where
+    decideStringFromState dfa (c:cs) q 
+      | Set.member c (dalphabet dfa) = case Map.lookup (q,c) (dtransition dfa) of 
+                                         Just q'  -> decideStringFromState dfa cs q'
+                                         Nothing  -> decideStringFromState dfa cs q
+      | otherwise                    = Nothing
+    decideStringFromState dfa [] q   = Map.lookup q (dstates dfa)
+
+-- TODO: more tests
+testDecideStringDFA :: Test
+testDecideStringDFA = "DFA decides strings correctly" ~:
+  let ab = Set.fromList "a" in
+  TestList[
+    decideString (emptySetDFA ab) "a" ~?= Just False,
+    decideString (emptyStringDFA ab) "a" ~?= Just False,
+    decideString (emptyStringDFA ab) "" ~?= Just True,
+    decideString (sigmaStarDFA ab) "" ~?= Just True,
+    decideString (sigmaStarDFA ab) "aaaaa" ~?= Just True,
+    decideString (sigmaStarDFA ab) "bbb" ~?= Nothing
+  ]
+
+-- TODO: write tests for this
+instance Automata NFA where
+  decideString nfa s = decideStringFromState nfa s (Set.singleton (nstart nfa)) where
+    decideStringFromState :: NFA -> String -> Set State -> Maybe Bool
+    decideStringFromState nfa (c:cs) qs 
+      | Set.member c (nalphabet nfa) = 
+          -- add all states reachable from the current set of states by reading the next symbol
+          let qs' = do
+                    q <- qs
+                    case Map.lookup (q, Just c) (ntransition nfa) of 
+                      Just nqs -> nqs
+                      Nothing  -> Set.empty
+          -- additionally add the states reachable by epsilon transitions from this new set of states
+          in let eqs' = do
+                        q <- qs'
+                        case Map.lookup (q, Nothing) (ntransition nfa) of
+                          Just nqs -> nqs
+                          Nothing  -> Set.empty
+          in decideStringFromState nfa cs (Set.union qs' eqs')
+      | otherwise                    = Nothing
+    decideStringFromState nfa [] qs  = any id <$> accepts where 
+                                       accepts :: Maybe [Bool]
+                                       accepts = mapM (\q -> Map.lookup q $ nstates nfa) (Set.toList qs)
 
 stateBijections :: States -> States -> [Map State State]
 stateBijections s1 s2 = let xs = Map.keys s1 
@@ -66,8 +136,8 @@ startStateSame m d1 d2 = case (Map.lookup (dstart d1) m) of
 testStartStateSame :: Test
 testStartStateSame = "start state same" ~: 
   let ab = Set.fromList ['0', '1']
-      d1 = acceptDFA ab
-      d2 = rejectDFA ab
+      d1 = sigmaStarDFA ab
+      d2 = emptySetDFA ab
       m = Map.fromList [(0,0)]
       in TestList[
         startStateSame m d1 d1 ~?= True,
@@ -90,8 +160,8 @@ transitionsSame m d1 d2 = all (\q -> all (\s -> equivTransition q s m) (dalphabe
 testTransitionsSame :: Test
 testTransitionsSame = "transitions same" ~: 
   let ab = Set.fromList ['0', '1']
-      d1 = acceptDFA ab
-      d2 = rejectDFA ab
+      d1 = sigmaStarDFA ab
+      d2 = emptySetDFA ab
       m = Map.fromList [(0,0)]
       in TestList[
         transitionsSame m d1 d1 ~?= True,
@@ -107,45 +177,46 @@ acceptStatesSame m d1 d2 = all (\(q1,q2) -> equivAccept q1 q2) (Map.toList m)
 testAcceptStatesSame :: Test
 testAcceptStatesSame = "accept states same" ~: 
   let ab = Set.fromList ['0', '1']
-      d1 = acceptDFA ab
-      d2 = rejectDFA ab
+      d1 = sigmaStarDFA ab
+      d2 = emptySetDFA ab
       m = Map.fromList [(0,0)]
       in TestList[
         acceptStatesSame m d1 d1 ~?= True,
         acceptStatesSame m d2 d2 ~?= True,
         acceptStatesSame m d1 d2 ~?= False
       ]
-
-isomorphicDFA :: DFA -> DFA -> Bool 
-isomorphicDFA d1 d2 = 
-  (dalphabet d1) == (dalphabet d2)
-  && Map.size (dstates d1) == Map.size (dstates d2)
-  && Map.size (dtransition d1) == Map.size (dtransition d2)
-  && any isIsomorphicMapping (stateBijections (dstates d1) (dstates d2))
-  where isIsomorphicMapping :: Map State State -> Bool
-        isIsomorphicMapping m = startStateSame m d1 d2 
-                                && transitionsSame m d1 d2 
-                                && acceptStatesSame m d1 d2
+-- We implement DFA equality as isomorphism.
+instance Eq DFA where
+  (==) d1 d2 = 
+    dalphabet d1 == dalphabet d2
+    && Map.size (dstates d1) == Map.size (dstates d2)
+    && Map.size (dtransition d1) == Map.size (dtransition d2)
+    && any isIsomorphicMapping (stateBijections (dstates d1) (dstates d2))
+    where isIsomorphicMapping :: Map State State -> Bool
+          isIsomorphicMapping m = startStateSame m d1 d2 
+                                  && transitionsSame m d1 d2 
+                                  && acceptStatesSame m d1 d2
 
 -- TODO: more tests!
-testIsomorphicDFA :: Test
-testIsomorphicDFA = "isomorphic DFA" ~: 
+testEqDFA :: Test
+testEqDFA = "test isomorphic DFA" ~: 
   let ab = Set.fromList ['0', '1']
-      d1 = acceptDFA ab
-      d2 = rejectDFA ab
+      d1 = sigmaStarDFA ab
+      d2 = emptySetDFA ab
       in TestList[
-        isomorphicDFA d1 d1 ~?= True,
-        isomorphicDFA d2 d2 ~?= True,
-        isomorphicDFA d1 d2 ~?= False,
-        isomorphicDFA d2 d1 ~?= False
+        d1 == d1 ~?= True,
+        d2 == d2 ~?= True,
+        d1 == d2 ~?= False,
+        d2 == d1 ~?= False
       ]
 
 main :: IO ()
 main = do
-    runTestTT $ TestList [testBijections, 
+    runTestTT $ TestList [testDecideStringDFA,
+                          testBijections, 
                           testStartStateSame,
                           testTransitionsSame, 
                           testAcceptStatesSame, 
-                          testIsomorphicDFA]
+                          testEqDFA]
     return ()
 
