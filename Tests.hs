@@ -28,19 +28,16 @@ zeroOneAlph = Set.fromList['0','1']
 testBrzozowskiConstruction :: Test
 testBrzozowskiConstruction = 
   TestList [
-    brzozowskiConstruction Empty ~?= emptyStringDFA zeroOneAlph,
-    brzozowskiConstruction [regex|(0|1)*|] ~?= sigmaStarDFA zeroOneAlph
+    brzozowskiConstruction Empty ~?= emptyStringDfa zeroOneAlph,
+    brzozowskiConstruction [regex|(0|1)*|] ~?= sigmaStarDfa zeroOneAlph
   ]
 
 testThompsonConstruction :: Test
 testThompsonConstruction = 
   TestList [
-    thompsonConstruction Empty ~?= emptyStringDFA zeroOneAlph,
-    thompsonConstruction [regex|(0|1)*|] ~?= sigmaStarDFA zeroOneAlph
+    thompsonConstruction Empty ~?= emptyStringDfa zeroOneAlph,
+    thompsonConstruction [regex|(0|1)*|] ~?= sigmaStarDfa zeroOneAlph
   ]
-
--- TODO: generate arbitrary strings that match regexes using QuickCheck and make sure the
--- generated DFAs accept
 
 testConstructionsIsomorphic :: Test
 testConstructionsIsomorphic = 
@@ -71,13 +68,23 @@ propIsomorphic regexp = thompsonConstruction regexp == brzozowskiConstruction re
 -- For any arbitrary regular expression and string, the DFAs produced 
 -- by the two construction algorithms either both accept or both reject
 propAcceptSame :: RegExp -> ZOString -> Bool
-propAcceptSame regexp s = let thompsDFA = thompsonConstruction regexp
-                              brzDFA = brzozowskiConstruction regexp
-                          in decideString brzDFA (str s) == decideString thompsDFA (str s)
+propAcceptSame regexp s = let thomDfa = thompsonConstruction regexp
+                              brzDfa = brzozowskiConstruction regexp
+                          in decideString brzDfa (str s) == decideString thomDfa (str s)
 
+propNfaDfaAcceptSame :: RegExp -> ZOString -> Bool
+propNfaDfaAcceptSame regexp s = let thomNfa = thompsonNfaConstruction regexp in
+                                let thomDfa = dfaConstruction thomNfa in
+                                decideString thomNfa (str s) == decideString thomDfa (str s)
+
+-- TODO: generate arbitrary strings that match regexes using QuickCheck and make sure the
+-- generated DFAs accept
 
 main :: IO ()
 main = do
-    runTestTT $ testConstructionsIsomorphic
+    runTestTT $ TestList [testBrzozowskiConstruction,
+                          testThompsonConstruction,
+                          testConstructionsIsomorphic]
     quickCheck $ propIsomorphic
     quickCheck $ propAcceptSame
+    quickCheck $ propNfaDfaAcceptSame

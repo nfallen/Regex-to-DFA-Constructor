@@ -45,16 +45,16 @@ data DFA = DFA {
                } deriving (Show)
 
 -- DFA that accepts all strings
-sigmaStarDFA :: Set Char -> DFA
-sigmaStarDFA ab = DFA {dstart = 0, dstates = Map.singleton 0 True, dtransition = Map.empty, dalphabet = ab}
+sigmaStarDfa :: Set Char -> DFA
+sigmaStarDfa ab = DFA {dstart = 0, dstates = Map.singleton 0 True, dtransition = Map.empty, dalphabet = ab}
 
 -- DFA that rejects all strings
-emptySetDFA :: Set Char -> DFA
-emptySetDFA ab = DFA {dstart = 0, dstates = Map.singleton 0 False, dtransition = Map.empty, dalphabet = ab}
+emptySetDfa :: Set Char -> DFA
+emptySetDfa ab = DFA {dstart = 0, dstates = Map.singleton 0 False, dtransition = Map.empty, dalphabet = ab}
 
 -- DFA that accepts only the empty string
-emptyStringDFA :: Set Char -> DFA
-emptyStringDFA ab = DFA {dstart = 0, 
+emptyStringDfa :: Set Char -> DFA
+emptyStringDfa ab = DFA {dstart = 0, 
                          dstates = Map.fromList [(0,True),(1,False)],
                          dtransition = Map.fromList [((0,s),1) | s <- Set.toList ab],
                          dalphabet = ab}
@@ -72,16 +72,16 @@ instance Automata DFA where
     decideStringFromState dfa [] q   = Map.lookup q (dstates dfa)
 
 -- TODO: more tests
-testDecideStringDFA :: Test
-testDecideStringDFA = "DFA decides strings correctly" ~:
+testDecideStringDfa :: Test
+testDecideStringDfa = "DFA decides strings correctly" ~:
   let ab = Set.fromList "a" in
   TestList[
-    decideString (emptySetDFA ab) "a" ~?= Just False,
-    decideString (emptyStringDFA ab) "a" ~?= Just False,
-    decideString (emptyStringDFA ab) "" ~?= Just True,
-    decideString (sigmaStarDFA ab) "" ~?= Just True,
-    decideString (sigmaStarDFA ab) "aaaaa" ~?= Just True,
-    decideString (sigmaStarDFA ab) "bbb" ~?= Nothing
+    decideString (emptySetDfa ab) "a" ~?= Just False,
+    decideString (emptyStringDfa ab) "a" ~?= Just False,
+    decideString (emptyStringDfa ab) "" ~?= Just True,
+    decideString (sigmaStarDfa ab) "" ~?= Just True,
+    decideString (sigmaStarDfa ab) "aaaaa" ~?= Just True,
+    decideString (sigmaStarDfa ab) "bbb" ~?= Nothing
   ]
 
 -- TODO: write tests for this
@@ -136,8 +136,8 @@ startStateSame m d1 d2 = case (Map.lookup (dstart d1) m) of
 testStartStateSame :: Test
 testStartStateSame = "start state same" ~: 
   let ab = Set.fromList ['0', '1']
-      d1 = sigmaStarDFA ab
-      d2 = emptySetDFA ab
+      d1 = sigmaStarDfa ab
+      d2 = emptySetDfa ab
       m = Map.fromList [(0,0)]
       in TestList[
         startStateSame m d1 d1 ~?= True,
@@ -160,8 +160,8 @@ transitionsSame m d1 d2 = all (\q -> all (\s -> equivTransition q s m) (dalphabe
 testTransitionsSame :: Test
 testTransitionsSame = "transitions same" ~: 
   let ab = Set.fromList ['0', '1']
-      d1 = sigmaStarDFA ab
-      d2 = emptySetDFA ab
+      d1 = sigmaStarDfa ab
+      d2 = emptySetDfa ab
       m = Map.fromList [(0,0)]
       in TestList[
         transitionsSame m d1 d1 ~?= True,
@@ -177,8 +177,8 @@ acceptStatesSame m d1 d2 = all (\(q1,q2) -> equivAccept q1 q2) (Map.toList m)
 testAcceptStatesSame :: Test
 testAcceptStatesSame = "accept states same" ~: 
   let ab = Set.fromList ['0', '1']
-      d1 = sigmaStarDFA ab
-      d2 = emptySetDFA ab
+      d1 = sigmaStarDfa ab
+      d2 = emptySetDfa ab
       m = Map.fromList [(0,0)]
       in TestList[
         acceptStatesSame m d1 d1 ~?= True,
@@ -201,8 +201,8 @@ instance Eq DFA where
 testEqDFA :: Test
 testEqDFA = "test isomorphic DFA" ~: 
   let ab = Set.fromList ['0', '1']
-      d1 = sigmaStarDFA ab
-      d2 = emptySetDFA ab
+      d1 = sigmaStarDfa ab
+      d2 = emptySetDfa ab
       in TestList[
         d1 == d1 ~?= True,
         d2 == d2 ~?= True,
@@ -212,7 +212,7 @@ testEqDFA = "test isomorphic DFA" ~:
 
 main :: IO ()
 main = do
-    runTestTT $ TestList [testDecideStringDFA,
+    runTestTT $ TestList [testDecideStringDfa,
                           testBijections, 
                           testStartStateSame,
                           testTransitionsSame, 
