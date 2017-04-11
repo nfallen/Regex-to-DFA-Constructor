@@ -23,9 +23,10 @@ unionThompson :: Set Char -> RegExp -> NFA
 unionThompson ab (Alt r1 r2) = let n1 = thompsonConstruction r1 in
                                let n2 = thompsonConstruction r2 in
                                       let firstUnion = Map.union (Map.union (Map.mapKeys (+1) (nstates n1)) (Map.mapKeys (+ (Map.size (nstates n1) - 1)) (nstates n2))) (Map.singleton 0 False) in
-                                        let unionStates = Map.union firstUnion (Map.singleton  ((Map.size firstUnion) - 1) True)  in -- add new start and finish
-                                        let unionTransition = Map.union (Map.mapKeys (\(a,b) -> (a + 1,b)) (ntransition n1)) (Map.mapKeys (\(a,b) -> (a + Map.size (ntransition n1) - 1,b)) (ntransition n2)) in --add new start finish transitions
-                                            NFA {nstart = 0, nstates = unionStates, ntransition = unionTransition, nalphabet = ab}
+                                        let unionStates = Map.union firstUnion (Map.singleton  ((Map.size firstUnion) - 1) True)  in 
+                                        let unionTransition = Map.union (Map.union (Map.mapKeys (\(a,b) -> (a + 1,b)) (ntransition n1)) (Map.mapKeys (\(a,b) -> (a + Map.size (ntransition n1) - 1,b)) (ntransition n2))) (Map.singleton (0,Nothing) (Set.fromList [1, Map.size (nstates n1)])) in 
+                                            let finalTransition = Map.union (Map.union (unionTransition) (Map.singleton ((Map.size unionTransition) - 1, Nothing) (Set.singleton $ Map.size unionTransition))) (Map.singleton (Map.size (nstates n1),Nothing) (Set.singleton $ Map.size unionTransition)) in
+                                                NFA {nstart = 0, nstates = unionStates, ntransition = unionTransition, nalphabet = ab}
 
 
 
