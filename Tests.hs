@@ -7,6 +7,8 @@ import Prelude
 
 import Regex
 import Automata
+import DFA
+import NFA
 import Construction
 
 import Data.Set.Monad (Set)
