@@ -222,16 +222,43 @@ testConcatNfa = TestList [
     }]
 
 kleeneNfa :: NFA -> NFA
-kleeneNfa n = undefined 
+kleeneNfa n = 
+  let firstStateN = 0
+      lastStateN = Set.size (nstates n)
+      states = Set.insert lastStateN $ Set.insert firstStateN $ fmap (+1) (nstates n)
+      incNT = fmap (fmap (+1)) $ 
+                 Map.mapKeys (\(a,b) -> (a + 1,b)) (ntransition n)
+      t0 = Map.insert (firstStateN,Nothing) (Set.fromList [1, lastStateN]) incNT
+      transitions = Map.insert (lastStateN - 1,Nothing) (Set.fromList [lastStateN,1]) t0
+      accepts = Set.singleton lastStateN
+    in NFA {nstart = 0,
+            nstates = states,
+            naccept = accepts,
+            ntransition = transitions,
+            nalphabet = nalphabet n}
 
 testKleeneNfa :: Test
-testKleeneNfa = undefined 
+testKleeneNfa = TestList [
+  kleeneNfa (concatNfa (singleCharNfa 'a') (singleCharNfa 'b')) ~?= 
+    NFA {
+      nstart = 0,
+      nstates = Set.fromList [0,1,2,3,4,5],
+      naccept = Set.singleton 5,
+      ntransition = Map.fromList [((0,Nothing), Set.fromList [1,5]),
+                                  ((1,Nothing), Set.fromList [2,4]),
+                                  ((2, Just 'a'), (Set.singleton 3)),
+                                  ((4, Just 'b'), (Set.singleton 5)),
+                                  ((4, Nothing), (Set.fromList [5,1])),
+                                  ((3,Nothing), (Set.singleton 4))],
+      nalphabet = Set.fromList "ab"
+    }] 
 
 main :: IO ()
 main = do
     runTestTT $ TestList [testSingleCharNfa,
                           testUnionNfa,
                           testConcatNfa,
+                          testKleeneNfa,
                           testEpsilonReachable,
                           testDecideStringNfa]
     return ()
