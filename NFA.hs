@@ -20,16 +20,16 @@ import Test.HUnit (Test(..), (~:), (~?=), runTestTT, assertBool)
 
 -- The NFA transition function has epsilon transitions
 -- and one state/symbol pair can map to multiple next states.
-type Ntransition = Map (State, Maybe Char) (Set State)
+type Ntransition = Map (QState, Maybe Char) (Set QState)
 
-data NFA = NFA { nstart :: State,
-                 nstates :: States,
-                 naccept :: States,
+data NFA = NFA { nstart :: QState,
+                 nstates :: QStates,
+                 naccept :: QStates,
                  ntransition :: Ntransition,
                  nalphabet :: Set Char
                } deriving (Show)
 
-epsilonReachable :: NFA -> Set State -> Set State
+epsilonReachable :: NFA -> Set QState -> Set QState
 epsilonReachable nfa qs 
   | qs == Set.empty = Set.empty
   | otherwise =
@@ -58,25 +58,38 @@ testEpsilonReachable = TestList [
     (Set.fromList [0,5])
     ~?= Set.fromList [0,1,2,4,5,6,7]
   ]
+
+symbolReachable :: NFA -> Set QState -> Char -> Set QState
+symbolReachable nfa qs c = do
+  q <- qs
+  case Map.lookup (q, Just c) (ntransition nfa) of 
+    Just nqs -> nqs
+    Nothing  -> Set.empty
+
+testSymbolReachable :: Test
+testSymbolReachable = TestList [
+  symbolReachable (singleCharNfa 'a') (Set.singleton 0) 'a' ~?= (Set.singleton 1),
+  symbolReachable (unionNfa (singleCharNfa 'a') (singleCharNfa 'b')) 
+    (Set.fromList [1,3]) 'a'
+    ~?= Set.fromList [2]]
+
+acceptStates :: NFA -> Set QState -> Bool
+acceptStates nfa qs = any accept (Set.toList qs) where
+                      accept q = Set.member q $ naccept nfa
   
 instance Automata NFA where
-  decideString nfa s = decideStringFromState nfa s (Set.singleton (nstart nfa)) where
-    decideStringFromState :: NFA -> String -> Set State -> Maybe Bool
-    decideStringFromState nfa (c:cs) qs 
+  decideString nfa s = decideStringFromQState nfa s (Set.singleton (nstart nfa)) where
+    decideStringFromQState :: NFA -> String -> Set QState -> Maybe Bool
+    decideStringFromQState nfa (c:cs) qs 
       | Set.member c (nalphabet nfa) = 
           -- get all states reachable by epsilon transitions from current set of states
           let eqs' = epsilonReachable nfa qs
           -- now compute states reachable from the new set of states by reading the next symbol
-          in let qs' = do
-                       q <- eqs'
-                       case Map.lookup (q, Just c) (ntransition nfa) of 
-                         Just nqs -> nqs
-                         Nothing  -> Set.empty
-          in decideStringFromState nfa cs qs'
+          in let qs' = symbolReachable nfa eqs' c
+          in decideStringFromQState nfa cs qs'
       | otherwise                    = Nothing
-    decideStringFromState nfa [] qs  = Just $ any accepts (Set.toList reachableQs) where
-                                       reachableQs = Set.union qs (epsilonReachable nfa qs)
-                                       accepts q = Set.member q $ naccept nfa
+    decideStringFromQState nfa [] qs  = Just $ acceptStates nfa (reachableQs) where
+                                        reachableQs = Set.union qs (epsilonReachable nfa qs)
 
 testDecideStringNfa :: Test
 testDecideStringNfa = TestList [
@@ -102,11 +115,11 @@ instance Eq NFA where
 singleCharNfa :: Char -> NFA --TODO: Change type signature to DFA when DFA converter is implemented 
 singleCharNfa char = 
   let ab = Set.singleton char
-      singleStates = Set.fromList [0,1]
+      singleQStates = Set.fromList [0,1]
       singleTransition = Map.fromList [((0, Just char), Set.singleton 1)]
       singleAccept = Set.singleton 1
   in NFA {nstart = 0, 
-          nstates = singleStates, 
+          nstates = singleQStates, 
           naccept = singleAccept,
           ntransition = singleTransition, 
           nalphabet = ab}
@@ -124,27 +137,27 @@ testSingleCharNfa = TestList [
 unionNfa :: NFA -> NFA -> NFA
 unionNfa n1 n2 = 
   let ab = Set.union (nalphabet n1) (nalphabet n2)
-      lastStateN1 = Set.size (nstates n1)
-      firstStateN2 = lastStateN1 + 1
-      lastStateN2 = lastStateN1 + Set.size (nstates n2)
-      lastStateUnion = lastStateN2 + 1
+      lastQStateN1 = Set.size (nstates n1)
+      firstQStateN2 = lastQStateN1 + 1
+      lastQStateN2 = lastQStateN1 + Set.size (nstates n2)
+      lastQStateUnion = lastQStateN2 + 1
       s0 = Set.union 
              (fmap (+1) (nstates n1)) 
-             (fmap (+ firstStateN2) (nstates n2))
-      s1 = Set.insert lastStateUnion s0
+             (fmap (+ firstQStateN2) (nstates n2))
+      s1 = Set.insert lastQStateUnion s0
       states = Set.insert 0 s1
       incN1T = fmap (fmap (+1)) $ 
                  Map.mapKeys (\(a,b) -> (a + 1,b)) (ntransition n1)
-      incN2T = fmap (fmap (+ firstStateN2)) $
-                 Map.mapKeys (\(a,b) -> (a + firstStateN2,b)) (ntransition n2)
+      incN2T = fmap (fmap (+ firstQStateN2)) $
+                 Map.mapKeys (\(a,b) -> (a + firstQStateN2,b)) (ntransition n2)
       u0 = Map.union incN1T incN2T
-      u1 = Map.insert (0, Nothing) (Set.fromList [1, firstStateN2]) u0
-      u2 = Map.insert (lastStateN1, Nothing) (Set.singleton lastStateUnion) u1
+      u1 = Map.insert (0, Nothing) (Set.fromList [1, firstQStateN2]) u0
+      u2 = Map.insert (lastQStateN1, Nothing) (Set.singleton lastQStateUnion) u1
       transitions = Map.insert 
-                      (lastStateN2, Nothing) 
-                      (Set.singleton lastStateUnion) 
+                      (lastQStateN2, Nothing) 
+                      (Set.singleton lastQStateUnion) 
                       u2
-      accepts = Set.singleton lastStateUnion
+      accepts = Set.singleton lastQStateUnion
   in NFA {nstart = 0, 
           nstates = states,
           naccept = accepts,
@@ -169,21 +182,21 @@ testUnionNfa = TestList [
 concatNfa :: NFA -> NFA -> NFA
 concatNfa n1 n2 =
   let ab = Set.union (nalphabet n1) (nalphabet n2)
-      firstStateN1 = 1
-      lastStateN1 = Set.size (nstates n1)
-      firstStateN2 = lastStateN1 + 1
-      lastStateN2 = lastStateN1 + Set.size (nstates n2)
+      firstQStateN1 = 1
+      lastQStateN1 = Set.size (nstates n1)
+      firstQStateN2 = lastQStateN1 + 1
+      lastQStateN2 = lastQStateN1 + Set.size (nstates n2)
       states = Set.insert 0 $ Set.union 
                  (fmap (+1) (nstates n1)) 
-                 (fmap (+ firstStateN2) (nstates n2))
+                 (fmap (+ firstQStateN2) (nstates n2))
       incN1T = fmap (fmap (+1)) $ 
                  Map.mapKeys (\(a,b) -> (a + 1,b)) (ntransition n1)
-      incN2T = fmap (fmap (+ firstStateN2)) $
-                 Map.mapKeys (\(a,b) -> (a + firstStateN2,b)) (ntransition n2)
+      incN2T = fmap (fmap (+ firstQStateN2)) $
+                 Map.mapKeys (\(a,b) -> (a + firstQStateN2,b)) (ntransition n2)
       t0 = Map.union incN1T incN2T
-      t1 = Map.insert (0, Nothing) (Set.fromList [firstStateN1, firstStateN2]) t0
-      transitions = Map.insert (lastStateN1, Nothing) (Set.singleton firstStateN2) t1
-      accepts = Set.singleton lastStateN2
+      t1 = Map.insert (0, Nothing) (Set.fromList [firstQStateN1, firstQStateN2]) t0
+      transitions = Map.insert (lastQStateN1, Nothing) (Set.singleton firstQStateN2) t1
+      accepts = Set.singleton lastQStateN2
   in NFA {nstart = 0, 
           nstates = states,
           naccept = accepts,
@@ -223,14 +236,14 @@ testConcatNfa = TestList [
 
 kleeneNfa :: NFA -> NFA
 kleeneNfa n = 
-  let firstStateN = 0
-      lastStateN = Set.size (nstates n)
-      states = Set.insert lastStateN $ Set.insert firstStateN $ fmap (+1) (nstates n)
+  let firstQStateN = 0
+      lastQStateN = Set.size (nstates n)
+      states = Set.insert lastQStateN $ Set.insert firstQStateN $ fmap (+1) (nstates n)
       incNT = fmap (fmap (+1)) $ 
                  Map.mapKeys (\(a,b) -> (a + 1,b)) (ntransition n)
-      t0 = Map.insert (firstStateN,Nothing) (Set.fromList [1, lastStateN]) incNT
-      transitions = Map.insert (lastStateN - 1,Nothing) (Set.fromList [lastStateN,1]) t0
-      accepts = Set.singleton lastStateN
+      t0 = Map.insert (firstQStateN,Nothing) (Set.fromList [1, lastQStateN]) incNT
+      transitions = Map.insert (lastQStateN - 1,Nothing) (Set.fromList [lastQStateN,1]) t0
+      accepts = Set.singleton lastQStateN
     in NFA {nstart = 0,
             nstates = states,
             naccept = accepts,
@@ -260,5 +273,6 @@ main = do
                           testConcatNfa,
                           testKleeneNfa,
                           testEpsilonReachable,
+                          testSymbolReachable,
                           testDecideStringNfa]
     return ()

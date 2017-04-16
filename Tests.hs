@@ -51,7 +51,7 @@ newtype ZOString = ZOString {str :: String} deriving (Show)
 
 instance Arbitrary ZOString where
   arbitrary = do
-      (k :: Int) <- choose (0, 100)
+      (k :: Int) <- choose (0, 50)
       ZOString <$> sequence [ (choose ('0','1')) | _ <- [1..k]]
 
 instance Arbitrary RegExp where
