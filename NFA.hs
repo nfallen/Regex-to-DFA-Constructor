@@ -128,39 +128,37 @@ testSingleCharNfa = TestList [
   }]
 
 unionNfa :: NFA -> NFA -> NFA
-unionNfa n1 n2 = case (n1 == n2) of
-                  True -> n1
-                  False -> case (n1 == emptyNFA) of
-                            True -> n2 
-                            False -> case (n2 == emptyNFA) of 
-                                      True -> n1 
-                                      False -> let ab = Set.union (nalphabet n1) (nalphabet n2)
-                                                   lastStateN1 = Set.size (nstates n1)
-                                                   firstStateN2 = lastStateN1 + 1
-                                                   lastStateN2 = lastStateN1 + Set.size (nstates n2)
-                                                   lastStateUnion = lastStateN2 + 1
-                                                   s0 = Set.union 
-                                                           (fmap (+1) (nstates n1)) 
-                                                           (fmap (+ firstStateN2) (nstates n2))
-                                                   s1 = Set.insert lastStateUnion s0
-                                                   states = Set.insert 0 s1
-                                                   incN1T = fmap (fmap (+1)) $ 
-                                                               Map.mapKeys (\(a,b) -> (a + 1,b)) (ntransition n1)
-                                                   incN2T = fmap (fmap (+ firstStateN2)) $
-                                                               Map.mapKeys (\(a,b) -> (a + firstStateN2,b)) (ntransition n2)
-                                                   u0 = Map.union incN1T incN2T
-                                                   u1 = Map.insert (0, Nothing) (Set.fromList [1, firstStateN2]) u0
-                                                   u2 = Map.insert (lastStateN1, Nothing) (Set.singleton lastStateUnion) u1
-                                                   transitions = Map.insert 
-                                                                    (lastStateN2, Nothing) 
-                                                                    (Set.singleton lastStateUnion) 
-                                                                    u2
-                                                   accepts = Set.singleton lastStateUnion
-                                                 in NFA {nstart = 0, 
-                                                        nstates = states,
-                                                        naccept = accepts,
-                                                        ntransition = transitions, 
-                                                        nalphabet = ab}
+unionNfa n1 n2 
+    | n1 == n2 = n1 
+    | n1 == emptyNFA = n2 
+    | n2 == emptyNFA = n1 
+    | otherwise = let ab = Set.union (nalphabet n1) (nalphabet n2)
+                      lastStateN1 = Set.size (nstates n1)
+                      firstStateN2 = lastStateN1 + 1
+                      lastStateN2 = lastStateN1 + Set.size (nstates n2)
+                      lastStateUnion = lastStateN2 + 1
+                      s0 = Set.union 
+                            (fmap (+1) (nstates n1)) 
+                            (fmap (+ firstStateN2) (nstates n2))
+                      s1 = Set.insert lastStateUnion s0
+                      states = Set.insert 0 s1
+                      incN1T = fmap (fmap (+1)) $ 
+                                Map.mapKeys (\(a,b) -> (a + 1,b)) (ntransition n1)
+                      incN2T = fmap (fmap (+ firstStateN2)) $
+                                Map.mapKeys (\(a,b) -> (a + firstStateN2,b)) (ntransition n2)
+                      u0 = Map.union incN1T incN2T
+                      u1 = Map.insert (0, Nothing) (Set.fromList [1, firstStateN2]) u0
+                      u2 = Map.insert (lastStateN1, Nothing) (Set.singleton lastStateUnion) u1
+                      transitions = Map.insert 
+                                      (lastStateN2, Nothing) 
+                                      (Set.singleton lastStateUnion) 
+                                      u2
+                      accepts = Set.singleton lastStateUnion
+                      in NFA {nstart = 0, 
+                              nstates = states,
+                              naccept = accepts,
+                              ntransition = transitions, 
+                              nalphabet = ab}
 
 testUnionNfa :: Test
 testUnionNfa = TestList [
