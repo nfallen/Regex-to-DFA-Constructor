@@ -14,6 +14,8 @@ import qualified Data.Set.Monad as Set
 import Data.Map (Map)
 import qualified Data.Map as Map 
 
+import Debug.Trace
+
 import Test.HUnit (Test(..), (~:), (~?=), runTestTT, assertBool) 
 
 -- The NFA transition function has epsilon transitions
@@ -27,29 +29,66 @@ data NFA = NFA { nstart :: State,
                  nalphabet :: Set Char
                } deriving (Show)
 
--- TODO: write tests for this
+epsilonReachable :: NFA -> Set State -> Set State
+epsilonReachable nfa qs 
+  | qs == Set.empty = Set.empty
+  | otherwise =
+      let eqs = do
+                q <- qs
+                case Map.lookup (q, Nothing) (ntransition nfa) of
+                  Just nqs -> nqs
+                  Nothing  -> Set.empty
+          eqsRest = epsilonReachable nfa eqs
+      in Set.union qs eqsRest
+
+testEpsilonReachable :: Test
+testEpsilonReachable = TestList [
+  epsilonReachable (singleCharNfa 'a') (Set.singleton 0) ~?= (Set.singleton 0),
+  epsilonReachable (unionNfa (singleCharNfa 'a') (singleCharNfa 'b')) 
+    (Set.fromList [0,4])
+    ~?= Set.fromList [0,1,3,4,5],
+  epsilonReachable (concatNfa 
+                   (unionNfa (singleCharNfa 'a') (singleCharNfa 'b')) 
+                   (singleCharNfa 'b'))
+    (Set.singleton 0)
+    ~?= Set.fromList [0,1,2,4,7],
+  epsilonReachable (concatNfa 
+                   (unionNfa (singleCharNfa 'a') (singleCharNfa 'b')) 
+                   (singleCharNfa 'b'))
+    (Set.fromList [0,5])
+    ~?= Set.fromList [0,1,2,4,5,6,7]
+  ]
+  
 instance Automata NFA where
   decideString nfa s = decideStringFromState nfa s (Set.singleton (nstart nfa)) where
     decideStringFromState :: NFA -> String -> Set State -> Maybe Bool
     decideStringFromState nfa (c:cs) qs 
       | Set.member c (nalphabet nfa) = 
-          -- add all states reachable from the current set of states by reading the next symbol
-          let qs' = do
-                    q <- qs
-                    case Map.lookup (q, Just c) (ntransition nfa) of 
-                      Just nqs -> nqs
-                      Nothing  -> Set.empty
-          -- additionally add the states reachable by epsilon transitions from this new set of states
-          in let eqs' = do
-                        q <- qs'
-                        case Map.lookup (q, Nothing) (ntransition nfa) of
-                          Just nqs -> nqs
-                          Nothing  -> Set.empty
-          in decideStringFromState nfa cs (Set.union qs' eqs')
+          -- get all states reachable by epsilon transitions from current set of states
+          let eqs' = epsilonReachable nfa qs
+          -- now compute states reachable from the new set of states by reading the next symbol
+          in let qs' = do
+                       q <- eqs'
+                       case Map.lookup (q, Just c) (ntransition nfa) of 
+                         Just nqs -> nqs
+                         Nothing  -> Set.empty
+          in decideStringFromState nfa cs qs'
       | otherwise                    = Nothing
-    decideStringFromState nfa [] qs  = Just $ any accepts (Set.toList qs) where
+    decideStringFromState nfa [] qs  = Just $ any accepts (Set.toList reachableQs) where
+                                       reachableQs = Set.union qs (epsilonReachable nfa qs)
                                        accepts q = Set.member q $ naccept nfa
 
+testDecideStringNfa :: Test
+testDecideStringNfa = TestList [
+  decideString (singleCharNfa 'a') "a" ~?= Just True,
+  decideString (singleCharNfa 'a') "aa" ~?= Just False,
+  decideString (singleCharNfa 'a') "b" ~?= Nothing,
+  decideString (unionNfa (singleCharNfa 'a') (singleCharNfa 'b')) "a" ~?= Just True,
+  decideString (unionNfa (singleCharNfa 'a') (singleCharNfa 'b')) "b" ~?= Just True,
+  decideString (unionNfa (singleCharNfa 'a') (singleCharNfa 'b')) "ab" ~?= Just False,
+  decideString (concatNfa (singleCharNfa 'a') (singleCharNfa 'b')) "ab" ~?= Just True,
+  decideString (concatNfa (singleCharNfa 'a') (singleCharNfa 'b')) "abb" ~?= Just False,
+  decideString (concatNfa (singleCharNfa 'a') (singleCharNfa 'b')) "aab" ~?= Just False]
 
 -- We implement NFA equality as exact equality
 instance Eq NFA where
@@ -163,6 +202,23 @@ testConcatNfa = TestList [
                                   ((3, Just 'b'), (Set.singleton 4)),
                                   ((2,Nothing), (Set.singleton 3))],
       nalphabet = Set.fromList "ab"
+    },
+  (concatNfa 
+    (unionNfa (singleCharNfa 'a') (singleCharNfa 'b')) 
+    (singleCharNfa 'b')) ~?=
+    NFA {
+      nstart = 0,
+      nstates = Set.fromList [0,1,2,3,4,5,6,7,8],
+      naccept = Set.singleton 8,
+      ntransition = Map.fromList [((0,Nothing), Set.fromList [1,7]),
+                                  ((1,Nothing), Set.fromList [2,4]),
+                                  ((2, Just 'a'), (Set.singleton 3)),
+                                  ((4, Just 'b'), (Set.singleton 5)),
+                                  ((7, Just 'b'), (Set.singleton 8)),
+                                  ((3,Nothing), (Set.singleton 6)),
+                                  ((5,Nothing), (Set.singleton 6)),
+                                  ((6,Nothing), (Set.singleton 7))],
+      nalphabet = Set.fromList "ab"
     }]
 
 kleeneNfa :: NFA -> NFA
@@ -175,5 +231,7 @@ main :: IO ()
 main = do
     runTestTT $ TestList [testSingleCharNfa,
                           testUnionNfa,
-                          testConcatNfa]
+                          testConcatNfa,
+                          testEpsilonReachable,
+                          testDecideStringNfa]
     return ()
