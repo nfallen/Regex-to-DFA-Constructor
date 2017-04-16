@@ -56,6 +56,20 @@ testThompsonNfaConstruction = TestList [
                                   ((3,Nothing), (Set.singleton 4))],
       nalphabet = Set.fromList "ab"
     },
+    thompsonNfaConstruction (Alt (Star (Seq (Char $ Set.singleton 'a') (Char $ Set.singleton 'b'))) 
+    							(Star (Seq (Char $ Set.singleton 'a') (Char $ Set.singleton 'b')))) ~?= 
+    NFA {
+      nstart = 0,
+      nstates = Set.fromList [0,1,2,3,4,5],
+      naccept = Set.singleton 5,
+      ntransition = Map.fromList [((0,Nothing), Set.fromList [1,5]),
+                                  ((1,Nothing), Set.fromList [2,4]),
+                                  ((2, Just 'a'), (Set.singleton 3)),
+                                  ((4, Just 'b'), (Set.singleton 5)),
+                                  ((4, Nothing), (Set.fromList [5,1])),
+                                  ((3,Nothing), (Set.singleton 4))],
+      nalphabet = Set.fromList "ab"
+    },
     thompsonNfaConstruction (Alt (Char $ Set.singleton 'a') (Char $ Set.singleton 'b')) ~?=
     NFA {
       nstart = 0,
