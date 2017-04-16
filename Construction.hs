@@ -19,13 +19,14 @@ thompsonConstruction :: RegExp -> DFA
 thompsonConstruction Empty = emptyStringDfa (Set.empty)
 thompsonConstruction Void = emptySetDfa (Set.empty)
 thompsonConstruction (Var s) = case (P.parse regexParser "" s) of 
-									Left err -> emptySetDfa (Set.empty) --creates the void dfa upon invalid string input
-									Right regexp -> thompsonConstruction regexp 
+                                    Left err -> emptySetDfa (Set.empty) --creates the void dfa upon invalid string input
+                                    Right regexp -> thompsonConstruction regexp 
 thompsonConstruction regexp = let nfa = thompsonNfaConstruction regexp
                               in dfaConstruction nfa
 
 thompsonNfaConstruction :: RegExp -> NFA
-thompsonNfaConstruction (Char c) = undefined 
+thompsonNfaConstruction (Char c) =  let (x:xs) = Set.toList c in
+                                    unionNfa (singleCharNfa x) (thompsonNfaConstruction (Char (Set.fromList xs)))
 thompsonNfaConstruction (Alt r1 r2) = unionNfa (thompsonNfaConstruction r1) (thompsonNfaConstruction r2) 
 thompsonNfaConstruction (Seq r1 r2) = concatNfa (thompsonNfaConstruction r1) (thompsonNfaConstruction r2) 
 thompsonNfaConstruction (Star r) = kleeneNfa (thompsonNfaConstruction r)
