@@ -74,6 +74,7 @@ propAcceptSame regexp s = let thomDfa = thompsonConstruction regexp
                               brzDfa = brzozowskiConstruction regexp
                           in decideString brzDfa (str s) == decideString thomDfa (str s)
 
+-- TODO: debug
 propNfaDfaAcceptSame :: RegExp -> ZOString -> Bool
 propNfaDfaAcceptSame regexp s = let thomNfa = thompsonNfaConstruction regexp in
                                 let thomDfa = dfaConstruction thomNfa in

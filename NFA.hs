@@ -29,6 +29,19 @@ data NFA = NFA { nstart :: QState,
                  nalphabet :: Set Char
                } deriving (Show)
 
+emptySetNfa ab = NFA {nstart = 0,
+                   nstates = Set.singleton 0,
+                   naccept = Set.empty,
+                   ntransition = Map.empty,
+                   nalphabet = Set.empty}
+
+emptyStringNfa ab = NFA {nstart = 0,
+                      nstates = Set.fromList [0,1],
+                      naccept = Set.singleton 0,
+                      ntransition = Map.fromList 
+                        [((0,Just s),Set.singleton 1) | s <- Set.toList ab],
+                      nalphabet = ab}
+
 epsilonReachable :: NFA -> Set QState -> Set QState
 epsilonReachable nfa qs 
   | qs == Set.empty = Set.empty
@@ -135,34 +148,37 @@ testSingleCharNfa = TestList [
   }]
 
 unionNfa :: NFA -> NFA -> NFA
-unionNfa n1 n2 = 
-  let ab = Set.union (nalphabet n1) (nalphabet n2)
-      lastQStateN1 = Set.size (nstates n1)
-      firstQStateN2 = lastQStateN1 + 1
-      lastQStateN2 = lastQStateN1 + Set.size (nstates n2)
-      lastQStateUnion = lastQStateN2 + 1
-      s0 = Set.union 
-             (fmap (+1) (nstates n1)) 
-             (fmap (+ firstQStateN2) (nstates n2))
-      s1 = Set.insert lastQStateUnion s0
-      states = Set.insert 0 s1
-      incN1T = fmap (fmap (+1)) $ 
-                 Map.mapKeys (\(a,b) -> (a + 1,b)) (ntransition n1)
-      incN2T = fmap (fmap (+ firstQStateN2)) $
-                 Map.mapKeys (\(a,b) -> (a + firstQStateN2,b)) (ntransition n2)
-      u0 = Map.union incN1T incN2T
-      u1 = Map.insert (0, Nothing) (Set.fromList [1, firstQStateN2]) u0
-      u2 = Map.insert (lastQStateN1, Nothing) (Set.singleton lastQStateUnion) u1
-      transitions = Map.insert 
-                      (lastQStateN2, Nothing) 
-                      (Set.singleton lastQStateUnion) 
-                      u2
-      accepts = Set.singleton lastQStateUnion
-  in NFA {nstart = 0, 
-          nstates = states,
-          naccept = accepts,
-          ntransition = transitions, 
-          nalphabet = ab}
+unionNfa n1 n2 
+    | n1 == n2 = n1 
+    | n1 == (emptySetNfa (Set.empty :: Set Char)) = n2 
+    | n2 == (emptySetNfa (Set.empty :: Set Char)) = n1 
+    | otherwise = let ab = Set.union (nalphabet n1) (nalphabet n2)
+                      lastQStateN1 = Set.size (nstates n1)
+                      firstQStateN2 = lastQStateN1 + 1
+                      lastQStateN2 = lastQStateN1 + Set.size (nstates n2)
+                      lastQStateUnion = lastQStateN2 + 1
+                      s0 = Set.union 
+                            (fmap (+1) (nstates n1)) 
+                            (fmap (+ firstQStateN2) (nstates n2))
+                      s1 = Set.insert lastQStateUnion s0
+                      states = Set.insert 0 s1
+                      incN1T = fmap (fmap (+1)) $ 
+                                Map.mapKeys (\(a,b) -> (a + 1,b)) (ntransition n1)
+                      incN2T = fmap (fmap (+ firstQStateN2)) $
+                                Map.mapKeys (\(a,b) -> (a + firstQStateN2,b)) (ntransition n2)
+                      u0 = Map.union incN1T incN2T
+                      u1 = Map.insert (0, Nothing) (Set.fromList [1, firstQStateN2]) u0
+                      u2 = Map.insert (lastQStateN1, Nothing) (Set.singleton lastQStateUnion) u1
+                      transitions = Map.insert 
+                                      (lastQStateN2, Nothing) 
+                                      (Set.singleton lastQStateUnion) 
+                                      u2
+                      accepts = Set.singleton lastQStateUnion
+                      in NFA {nstart = 0, 
+                              nstates = states,
+                              naccept = accepts,
+                              ntransition = transitions, 
+                              nalphabet = ab}
 
 testUnionNfa :: Test
 testUnionNfa = TestList [
