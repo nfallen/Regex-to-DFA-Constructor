@@ -11,12 +11,17 @@ import DFA
 import NFA
 import Construction
 
+import Data.Map (Map)
+import qualified Data.Map as Map 
+
 import Data.Set.Monad (Set)
 import qualified Data.Set.Monad as Set
 
 import Test.HUnit (Test(..), (~:), (~?=), runTestTT, assertBool)  
 import Test.QuickCheck
 import Test.QuickCheck.Function
+
+import Debug.Trace
 
 chars, validDotComMail :: RegExp
 chars           = [regex|[a-z]|[A-Z]|[0-9]|[-_.]|]
@@ -73,6 +78,15 @@ propAcceptSame :: RegExp -> ZOString -> Bool
 propAcceptSame regexp s = let thomDfa = thompsonConstruction regexp
                               brzDfa = brzozowskiConstruction regexp
                           in decideString brzDfa (str s) == decideString thomDfa (str s)
+
+propThompsonFinishes :: RegExp -> ZOString -> Bool
+propThompsonFinishes regexp s = let thomNfa = thompsonNfaConstruction regexp in
+                                trace (show thomNfa) True
+
+propDfaFinishes :: RegExp -> ZOString -> Bool
+propDfaFinishes regexp s = let thomNfa = thompsonNfaConstruction regexp in
+                           let thomDfa = dfaConstruction thomNfa in
+                           trace (show thomDfa) True
 
 -- TODO: debug
 propNfaDfaAcceptSame :: RegExp -> ZOString -> Bool
