@@ -11,6 +11,9 @@ import DFA
 import NFA
 import Construction
 
+import Data.Map (Map)
+import qualified Data.Map as Map 
+
 import Data.Set.Monad (Set)
 import qualified Data.Set.Monad as Set
 
@@ -18,12 +21,14 @@ import Test.HUnit (Test(..), (~:), (~?=), runTestTT, assertBool)
 import Test.QuickCheck
 import Test.QuickCheck.Function
 
+import Debug.Trace
+
 chars, validDotComMail :: RegExp
 chars           = [regex|[a-z]|[A-Z]|[0-9]|[-_.]|]
 validDotComMail = [regex|${plus chars}@${plus chars}.com|]
  
 plus :: RegExp -> RegExp
-plus r = Seq r (Star r)
+plus r = rSeq r (rStar r)
 
 zeroOneAlph = Set.fromList['0','1']
 
@@ -51,17 +56,21 @@ newtype ZOString = ZOString {str :: String} deriving (Show)
 
 instance Arbitrary ZOString where
   arbitrary = do
-      (k :: Int) <- choose (0, 100)
+      (k :: Int) <- choose (0, 50)
       ZOString <$> sequence [ (choose ('0','1')) | _ <- [1..k]]
 
 instance Arbitrary RegExp where
-   arbitrary = oneof [Char . Set.fromList <$> sublistOf "01",
-                      Alt <$> arbitrary <*> arbitrary, 
-                      Seq <$> arbitrary <*> arbitrary,
-                      Star <$> arbitrary, 
+   arbitrary = oneof [rChar . Set.fromList <$> sublistOf "01",
+                      rAlt <$> arbitrary <*> arbitrary, 
+                      rSeq <$> arbitrary <*> arbitrary,
+                      rStar <$> arbitrary, 
                       return Empty,
                       return Void]
-   shrink = undefined
+   shrink (Char cs)   = [rChar (Set.singleton '0'), rChar (Set.singleton '1')]
+   shrink (Alt r1 r2) = [r1, r2]
+   shrink (Seq r1 r2) = [r1, r2]
+   shrink (Star r)    = [r]
+   shrink _           = []
 
 -- On any arbitrary regular expression, the two construction algorithms produce isomorphic DFAs
 propIsomorphic :: RegExp -> Bool
@@ -74,6 +83,16 @@ propAcceptSame regexp s = let thomDfa = thompsonConstruction regexp
                               brzDfa = brzozowskiConstruction regexp
                           in decideString brzDfa (str s) == decideString thomDfa (str s)
 
+propThompsonFinishes :: RegExp -> ZOString -> Bool
+propThompsonFinishes regexp s = let thomNfa = thompsonNfaConstruction regexp in
+                                trace (show thomNfa) True
+
+propDfaFinishes :: RegExp -> ZOString -> Bool
+propDfaFinishes regexp s = let thomNfa = thompsonNfaConstruction regexp in
+                           let thomDfa = dfaConstruction thomNfa in
+                           trace (show thomDfa) True
+
+-- TODO: debug
 propNfaDfaAcceptSame :: RegExp -> ZOString -> Bool
 propNfaDfaAcceptSame regexp s = let thomNfa = thompsonNfaConstruction regexp in
                                 let thomDfa = dfaConstruction thomNfa in

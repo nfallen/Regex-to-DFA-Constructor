@@ -14,15 +14,18 @@ import qualified Data.Map as Map
 
 import Test.HUnit (Test(..), (~:), (~?=), runTestTT, assertBool) 
 
-type State = Int
+type QState = Int
 
-type States = Set State
+type QStates = Set QState
+
+defaultAlpha :: Set Char
+defaultAlpha = Set.fromList "0"
 
 class Automata a where
   decideString :: a -> String -> Maybe Bool
 
 
-stateBijections :: States -> States -> [Map State State]
+stateBijections :: QStates -> QStates -> [Map QState QState]
 stateBijections s1 s2 = let xs = Set.toList s1 
                             perms = List.permutations (Set.toList s2) in 
                             Map.fromList <$> (fmap (\perm -> zip xs perm) perms)

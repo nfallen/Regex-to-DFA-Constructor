@@ -14,12 +14,12 @@ import qualified Data.Map as Map
 
 import Test.HUnit (Test(..), (~:), (~?=), runTestTT, assertBool) 
 
-type Dtransition = Map (State, Char) State
+type Dtransition = Map (QState, Char) QState
 
 data DFA = DFA {
-                 dstart :: State, 
-                 dstates :: States, 
-                 daccept :: States,
+                 dstart :: QState, 
+                 dstates :: QStates, 
+                 daccept :: QStates,
                  dtransition :: Dtransition, 
                  dalphabet :: Set Char
                } deriving (Show)
@@ -48,14 +48,23 @@ emptyStringDfa ab = DFA {dstart = 0,
                          dtransition = Map.fromList [((0,s),1) | s <- Set.toList ab],
                          dalphabet = ab}
 
+withQState :: QState -> DFA -> DFA
+withQState q dfa = dfa { dstates = Set.insert q (dstates dfa) }
+
+withAccepts :: Set QState -> DFA -> DFA
+withAccepts qs dfa = dfa { daccept = qs }
+
+withTransition :: (QState, Char) -> QState -> DFA -> DFA
+withTransition qc q' dfa = dfa { dtransition = Map.insert qc q' (dtransition dfa) }
+
 instance Automata DFA where
-  decideString dfa s = decideStringFromState dfa s (dstart dfa) where
-    decideStringFromState dfa (c:cs) q 
+  decideString dfa s = decideStringFromQState dfa s (dstart dfa) where
+    decideStringFromQState dfa (c:cs) q 
       | Set.member c (dalphabet dfa) = case Map.lookup (q,c) (dtransition dfa) of 
-                                         Just q'  -> decideStringFromState dfa cs q'
-                                         Nothing  -> decideStringFromState dfa cs q
+                                         Just q'  -> decideStringFromQState dfa cs q'
+                                         Nothing  -> decideStringFromQState dfa cs q
       | otherwise                    = Nothing
-    decideStringFromState dfa [] q   = Just (Set.member q (daccept dfa))
+    decideStringFromQState dfa [] q   = Just (Set.member q (daccept dfa))
 
 -- TODO: more tests
 testDecideStringDfa :: Test
@@ -77,28 +86,28 @@ instance Eq DFA where
     && Set.size (dstates d1) == Set.size (dstates d2)
     && Map.size (dtransition d1) == Map.size (dtransition d2)
     && any isIsomorphicMapping (stateBijections (dstates d1) (dstates d2))
-    where isIsomorphicMapping :: Map State State -> Bool
-          isIsomorphicMapping m = startStateSame m d1 d2 
+    where isIsomorphicMapping :: Map QState QState -> Bool
+          isIsomorphicMapping m = startQStateSame m d1 d2 
                                   && transitionsSame m d1 d2 
-                                  && acceptStatesSame m d1 d2
+                                  && acceptQStatesSame m d1 d2
 
-startStateSame :: Map State State -> DFA -> DFA -> Bool
-startStateSame m d1 d2 = case (Map.lookup (dstart d1) m) of 
+startQStateSame :: Map QState QState -> DFA -> DFA -> Bool
+startQStateSame m d1 d2 = case (Map.lookup (dstart d1) m) of 
                             Just q2 -> (dstart d1) == q2
                             _ ->  False
 
-testStartStateSame :: Test
-testStartStateSame = "start state same" ~: 
+testStartQStateSame :: Test
+testStartQStateSame = "start state same" ~: 
   let ab = Set.fromList ['0', '1']
       d1 = sigmaStarDfa ab
       d2 = emptySetDfa ab
       m = Map.fromList [(0,0)]
       in TestList[
-        startStateSame m d1 d1 ~?= True,
-        startStateSame m d1 d2 ~?= True
+        startQStateSame m d1 d1 ~?= True,
+        startQStateSame m d1 d2 ~?= True
       ]
 
-transitionsSame :: Map State State -> DFA -> DFA -> Bool
+transitionsSame :: Map QState QState -> DFA -> DFA -> Bool
 transitionsSame m d1 d2 = all (\q -> all (\s -> equivTransition q s m) (dalphabet d1)) (Map.keys m)
   where equivTransition q1 s m = case Map.lookup q1 m of 
           Just q2 ->
@@ -122,20 +131,20 @@ testTransitionsSame = "transitions same" ~:
         transitionsSame m d1 d2 ~?= True
       ]
 
-acceptStatesSame :: Map State State -> DFA -> DFA -> Bool
-acceptStatesSame m d1 d2 = all (\(q1,q2) -> equivAccept q1 q2) (Map.toList m)
+acceptQStatesSame :: Map QState QState -> DFA -> DFA -> Bool
+acceptQStatesSame m d1 d2 = all (\(q1,q2) -> equivAccept q1 q2) (Map.toList m)
   where equivAccept q1 q2 = Set.member q1 (daccept d1) == Set.member q2 (daccept d2)
 
-testAcceptStatesSame :: Test
-testAcceptStatesSame = "accept states same" ~: 
+testAcceptQStatesSame :: Test
+testAcceptQStatesSame = "accept states same" ~: 
   let ab = Set.fromList ['0', '1']
       d1 = sigmaStarDfa ab
       d2 = emptySetDfa ab
       m = Map.fromList [(0,0)]
       in TestList[
-        acceptStatesSame m d1 d1 ~?= True,
-        acceptStatesSame m d2 d2 ~?= True,
-        acceptStatesSame m d1 d2 ~?= False
+        acceptQStatesSame m d1 d1 ~?= True,
+        acceptQStatesSame m d2 d2 ~?= True,
+        acceptQStatesSame m d1 d2 ~?= False
       ]
 
 -- TODO: more tests!
@@ -154,8 +163,8 @@ testEqDFA = "test isomorphic DFA" ~:
 main :: IO ()
 main = do
     runTestTT $ TestList [testDecideStringDfa,
-                          testStartStateSame,
+                          testStartQStateSame,
                           testTransitionsSame, 
-                          testAcceptStatesSame, 
+                          testAcceptQStatesSame, 
                           testEqDFA]
     return ()
