@@ -35,7 +35,7 @@ emptySetNfa ab = NFA {nstart = 0,
                    nstates = Set.singleton 0,
                    naccept = Set.empty,
                    ntransition = Map.empty,
-                   nalphabet = Set.empty}
+                   nalphabet = ab}
 
 emptyStringNfa ab = NFA {nstart = 0,
                       nstates = Set.fromList [0,1],
@@ -101,15 +101,15 @@ testSymbolReachable = TestList [
     (Set.fromList [1,3]) 'a'
     ~?= Set.fromList [2]]
 
-acceptStates :: NFA -> Set QState -> Bool
-acceptStates nfa qs = any accept (Set.toList qs) where
-                      accept q = Set.member q $ naccept nfa
+acceptsSomeState :: NFA -> Set QState -> Bool
+acceptsSomeState nfa qs = any accept (Set.toList qs) where
+                          accept q = Set.member q $ naccept nfa
   
 instance Automata NFA where
   decideString nfa s = decideStringFromQState nfa s (Set.singleton (nstart nfa)) where
     decideStringFromQState :: NFA -> String -> Set QState -> Maybe Bool
     decideStringFromQState nfa [] qs  = 
-      Just $ acceptStates nfa (epsilonReachable nfa qs)
+      Just $ acceptsSomeState nfa (epsilonReachable nfa qs)
     decideStringFromQState nfa (c:cs) qs 
       | Set.member c (nalphabet nfa) = 
           -- get all states reachable by epsilon transitions from current set of states

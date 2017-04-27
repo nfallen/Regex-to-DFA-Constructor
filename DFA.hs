@@ -48,11 +48,11 @@ emptyStringDfa ab = DFA {dstart = 0,
                          dtransition = Map.fromList [((0,s),1) | s <- Set.toList ab],
                          dalphabet = ab}
 
-withQState :: QState -> Bool -> DFA -> DFA
-withQState q isAccept dfa = dfa { dstates = Set.insert q (dstates dfa),
-                                  daccept = if isAccept 
-                                            then Set.insert q (daccept dfa)
-                                            else daccept dfa }
+withQState :: QState -> DFA -> DFA
+withQState q dfa = dfa { dstates = Set.insert q (dstates dfa) }
+
+withAccepts :: Set QState -> DFA -> DFA
+withAccepts qs dfa = dfa { daccept = qs }
 
 withTransition :: (QState, Char) -> QState -> DFA -> DFA
 withTransition qc q' dfa = dfa { dtransition = Map.insert qc q' (dtransition dfa) }

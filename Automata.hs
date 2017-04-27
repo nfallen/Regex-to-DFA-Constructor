@@ -18,6 +18,9 @@ type QState = Int
 
 type QStates = Set QState
 
+defaultAlpha :: Set Char
+defaultAlpha = Set.fromList "0"
+
 class Automata a where
   decideString :: a -> String -> Maybe Bool
 

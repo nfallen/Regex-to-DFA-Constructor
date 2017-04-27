@@ -8,7 +8,7 @@ module Regex where
 import Prelude
 
 import Data.Set.Monad (Set)
-import qualified Data.Set.Monad as Set (singleton, fromList, toList, member, delete)
+import qualified Data.Set.Monad as Set (singleton, empty, fromList, toList, member, delete)
 
 import Data.Generics
 
@@ -35,6 +35,31 @@ data RegExp = Char (Set Char)      -- single literal character
             | Var String           -- a variable holding another regexp
   deriving (Show, Eq)
 
+rAlt :: RegExp -> RegExp -> RegExp
+rAlt Void x = x
+rAlt x Void = x
+rAlt r1 r2 
+  | r1 == r2  = r1
+  | otherwise = Alt r1 r2
+
+rSeq :: RegExp -> RegExp -> RegExp
+rSeq Void _ = Void -- concatenating any string to void is void 
+rSeq _ Void = Void
+rSeq Empty x = x -- concatenating the empty string to any string is itself
+rSeq x Empty = x
+rSeq r1 r2 = Seq r1 r2 -- no optimization
+
+rStar :: RegExp -> RegExp
+rStar (Star x) = Star x -- two iterations is the same as one
+rStar Empty    = Empty -- iterating the empty string is the empty string
+rStar Void     = Empty -- zero or more occurrences of void is empty
+rStar r        = Star r -- no optimization
+
+rChar :: Set Char -> RegExp
+rChar cs 
+  | cs == Set.empty = Empty
+  | otherwise = Char cs
+
 regex :: QuasiQuoter
 regex = QuasiQuoter {
     quoteExp  = compile,
@@ -56,18 +81,18 @@ regexParser = alts <* eof where
   atom       = try var P.<|> char
   var        = Var <$> (string "${" *> many1 (noneOf "}") <* P.char '}')
   char       = charclass P.<|> singlechar
-  singlechar = (Char . Set.singleton) <$> noneOf specials
-  charclass  = fmap (Char . Set.fromList) $
+  singlechar = (rChar . Set.singleton) <$> noneOf specials
+  charclass  = fmap (rChar . Set.fromList) $
                  P.char '[' *> content <* P.char ']'
   content    = try (concat <$> many1 range)
                  P.<|> many1 (noneOf specials)
   range      = enumFromTo
                  <$> (noneOf specials <* P.char '-')
                  <*> noneOf specials
-  alts       = try (Alt <$> seqs <*> (P.char '|' *> alts)) P.<|> seqs
-  seqs       = try (Seq <$> star <*> seqs) P.<|> star
-  star       = try (Star <$> (atom <* P.char '*'))
-                 P.<|> try (Star <$> (P.char '(' *> alts <* string ")*"))
+  alts       = try (rAlt <$> seqs <*> (P.char '|' *> alts)) P.<|> seqs
+  seqs       = try (rSeq <$> star <*> seqs) P.<|> star
+  star       = try (rStar <$> (atom <* P.char '*'))
+                 P.<|> try (rStar <$> (P.char '(' *> alts <* string ")*"))
                  P.<|> atom
   specials   = "[]()*|"
 
