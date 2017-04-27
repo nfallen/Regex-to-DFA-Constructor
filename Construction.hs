@@ -5,6 +5,9 @@ import Automata
 import DFA
 import NFA
 
+import Data.List
+import qualified Data.List as List
+
 import Data.Map (Map)
 import qualified Data.Map as Map 
 
@@ -90,6 +93,80 @@ dfaConstruction :: NFA -> DFA
 dfaConstruction = undefined 
 
 
+dfaMinimization :: DFA -> DFA
+dfaMinimization d = mergePair (deleteUnreachable d (Set.toList (dstates d))) 
+                              $ allPairs $ Set.toList $ dstates d
+
+-- TODO: more tests
+testdfaMinimization :: Test
+testdfaMinimization = "Resulting DFA is minimized" ~:
+  TestList[
+    
+  ]
+
+deleteUnreachable :: DFA -> [Automata.State] -> DFA
+deleteUnreachable d [] = d
+deleteUnreachable d @states(x:xs) = if ((not $ inwardTransition x $ dtransition d) && not (x == dstart d)) 
+                                    then deleteUnreachable (DFA {dstart = dstart d,
+                                                                 dstates = Set.delete x (dstates d),
+                                                                 daccept = daccept d,  
+                                                                 dtransition = Map.fromList $ deleteKey x $ Map.toList $ dtransition d, 
+                                                                 dalphabet = dalphabet d }) xs 
+                                    else deleteUnreachable d xs 
+
+-- TODO: more tests
+testdeleteUnreachable :: Test
+testdeleteUnreachable = "Unreachable states deleted from resulting DFA" ~:
+  TestList[
+    
+  ]
+
+
+deleteKey :: Automata.State -> [((Automata.State, Char), Automata.State)] -> [((Automata.State, Char), Automata.State)] 
+deleteKey k translist = List.filter (\((a,b),c) -> not (a == k)) translist 
+
+replaceInwardTransitions :: Automata.State -> Automata.State-> [((Automata.State, Char), Automata.State)] -> [((Automata.State, Char), Automata.State)] 
+replaceInwardTransitions k1 k2 translist = List.map (\((a,b),c) -> ((a,b),k2)) 
+                                           $ List.filter (\((a,b),c) -> (c == k1)) translist                                  
+
+inwardTransition :: Automata.State -> Dtransition -> Bool 
+inwardTransition s transmap = elem s (Map.elems transmap)  
+
+allPairs :: [Automata.State] -> [(Automata.State,Automata.State)]
+allPairs states = [(s1,s2) | s1 <- states, s2 <- states, s1 < s2]
+
+mergePair :: DFA -> [(Automata.State,Automata.State)] -> DFA
+mergePair d [] = d 
+mergePair d (x:xs) =  let newd = mergeIndistinct d (fst x) (snd x) in
+                          if (newd == d) 
+                          then mergePair d xs -- try next pair in dfa d
+                          else mergePair newd xs 
+
+mergeIndistinct :: DFA -> Automata.State -> Automata.State -> DFA
+mergeIndistinct d x1 x2 = if indistinct d x1 x2 
+                          then  DFA {dstart = dstart d,
+                                     dstates = Set.delete x2 (dstates d),
+                                     daccept = daccept d,  
+                                     dtransition = Map.union (Map.fromList (deleteKey x2 (Map.toList (dtransition d))))
+                                                   $ Map.fromList $ replaceInwardTransitions x2 x1 $ Map.toList $ dtransition d, 
+                                     dalphabet = dalphabet d}
+                          else d 
+
+indistinct :: DFA -> Automata.State -> Automata.State -> Bool
+indistinct d1 s1 s2 = if (((Set.member s1 $ daccept d1) && not (Set.member s2 $ daccept d1)) ||
+                               ((Set.member s2 $ daccept d1) && not (Set.member s1 $ daccept d1)))
+                      then False
+                      else transitionsDistinct d1 s1 s2 where
+                           transitionsDistinct :: DFA -> Automata.State -> Automata.State -> Bool 
+                           transitionsDistinct d1 s1 s2 = iterateAlphabet alist d1 s1 s2 
+                                                                 where alist = Set.toList $ dalphabet d1 
+
+iterateAlphabet :: [Char] -> DFA -> Automata.State -> Automata.State -> Bool
+iterateAlphabet (x:xs) d1 s1 s2 = case (Map.lookup (s1,x) (dtransition d1)) of 
+                                        Just a -> case (Map.lookup (s2,x) (dtransition d1)) of 
+                                                          Just b -> a == b && iterateAlphabet xs d1 s1 s2 
+                                                          _ -> False 
+                                        _ -> False  
 
 
 main :: IO ()
