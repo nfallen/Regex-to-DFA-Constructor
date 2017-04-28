@@ -222,7 +222,23 @@ testDfaMinimization = "Resulting DFA is minimized" ~:
          dstates = Set.fromList [0,2,5],
          daccept = Set.fromList [2],
          dtransition = Map.fromList [((0,'0'),0),((0,'1'),2),((2,'0'),2),((2,'1'),5),((5,'0'),5),((5,'1'),5)],
-         dalphabet = Set.fromList ['0','1']}
+         dalphabet = Set.fromList ['0','1']},
+
+    dfaMinimization (DFA {dstart = 0, 
+         dstates = Set.fromList [0,1,2,3],
+         daccept = Set.fromList [1],
+         dtransition = Map.fromList [((0,'a'),1),((1,'a'),2),((2,'a'),3),((3,'a'),2)],
+         dalphabet = Set.fromList "a"}) ~?=
+    dfaMinimization (dfaConstruction (singleCharNfa 'a')),
+
+    dfaMinimization (DFA {dstart = 0,
+                      dstates = Set.fromList [0,1],
+                      daccept = Set.empty,
+                      dtransition = Map.fromList [((1,'a'),0)],
+                      dalphabet = (Set.fromList ['a','b'])}) ~?=
+    emptySetDfa (Set.fromList ['a','b'])
+
+
   ]
 
 deleteUnreachable :: DFA -> [QState] -> DFA
