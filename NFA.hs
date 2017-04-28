@@ -1,5 +1,7 @@
 module NFA where
 
+import Alpha
+
 import Automata
 
 import Control.Monad
@@ -9,6 +11,8 @@ import Control.Monad.State
 import Data.Maybe
 
 import Data.List as List
+
+import Data.List.NonEmpty as NonEmpty
 
 import Data.Set.Monad (Set)
 import qualified Data.Set.Monad as Set
@@ -28,20 +32,22 @@ data NFA = NFA { nstart :: QState,
                  nstates :: QStates,
                  naccept :: QStates,
                  ntransition :: Ntransition,
-                 nalphabet :: Set Char
+                 nalphabet :: Alpha
                } deriving (Show)
 
+emptySetNfa :: Alpha -> NFA
 emptySetNfa ab = NFA {nstart = 0,
                    nstates = Set.singleton 0,
                    naccept = Set.empty,
                    ntransition = Map.empty,
                    nalphabet = ab}
 
+emptyStringNfa :: Alpha -> NFA
 emptyStringNfa ab = NFA {nstart = 0,
                       nstates = Set.fromList [0,1],
                       naccept = Set.singleton 0,
                       ntransition = Map.fromList 
-                        [((0,Just s),Set.singleton 1) | s <- Set.toList ab],
+                        [((0,Just s),Set.singleton 1) | s <- NonEmpty.toList ab],
                       nalphabet = ab}
 
 -- takes in a set of states, returns the ones that are unseen 
@@ -106,18 +112,19 @@ acceptsSomeState nfa qs = any accept (Set.toList qs) where
                           accept q = Set.member q $ naccept nfa
   
 instance Automata NFA where
-  decideString nfa s = decideStringFromQState nfa s (Set.singleton (nstart nfa)) where
-    decideStringFromQState :: NFA -> String -> Set QState -> Maybe Bool
-    decideStringFromQState nfa [] qs  = 
-      Just $ acceptsSomeState nfa (epsilonReachable nfa qs)
-    decideStringFromQState nfa (c:cs) qs 
-      | Set.member c (nalphabet nfa) = 
-          -- get all states reachable by epsilon transitions from current set of states
-          let eqs' = epsilonReachable nfa qs
-          -- now compute states reachable from the new set of states by reading the next symbol
-          in let qs' = symbolReachable nfa eqs' c
-          in decideStringFromQState nfa cs qs'
-      | otherwise                    = Nothing
+  decideString nfa s 
+    | any (\c -> notElem c (nalphabet nfa)) s = Nothing
+    | otherwise = decideStringFromQState nfa s (Set.singleton (nstart nfa))
+    where
+      decideStringFromQState :: NFA -> String -> Set QState -> Maybe Bool
+      decideStringFromQState nfa [] qs  = 
+        Just $ acceptsSomeState nfa (epsilonReachable nfa qs)
+      decideStringFromQState nfa (c:cs) qs = 
+        -- get all states reachable by epsilon transitions from current set of states
+        let eqs' = epsilonReachable nfa qs
+        -- now compute states reachable from the new set of states by reading the next symbol
+        in let qs' = symbolReachable nfa eqs' c
+        in decideStringFromQState nfa cs qs'
 
 testNfa1 = kleeneNfa (singleCharNfa 'a')
 testNfa2 = unionNfa (singleCharNfa 'a') (singleCharNfa 'b')
@@ -157,7 +164,7 @@ instance Eq NFA where
 
 singleCharNfa :: Char -> NFA 
 singleCharNfa char = 
-  let ab = Set.singleton char
+  let ab = return char
       singleQStates = Set.fromList [0,1]
       singleTransition = Map.fromList [((0, Just char), Set.singleton 1)]
       singleAccept = Set.singleton 1
@@ -174,41 +181,41 @@ testSingleCharNfa = TestList [
     nstates = Set.fromList [0,1],
     naccept = Set.singleton 1,
     ntransition = Map.fromList [((0,Just 'a'), Set.singleton 1)],
-    nalphabet = Set.singleton 'a'
+    nalphabet = return 'a'
   }]
 
 unionNfa :: NFA -> NFA -> NFA
 unionNfa n1 n2 
-    | n1 == n2 = n1 
-    | n1 == (emptySetNfa (Set.empty :: Set Char)) = n2 
-    | n2 == (emptySetNfa (Set.empty :: Set Char)) = n1 
-    | otherwise = let ab = Set.union (nalphabet n1) (nalphabet n2)
-                      lastQStateN1 = Set.size (nstates n1)
-                      firstQStateN2 = lastQStateN1 + 1
-                      lastQStateN2 = lastQStateN1 + Set.size (nstates n2)
-                      lastQStateUnion = lastQStateN2 + 1
-                      s0 = Set.union 
-                            (fmap (+1) (nstates n1)) 
-                            (fmap (+ firstQStateN2) (nstates n2))
-                      s1 = Set.insert lastQStateUnion s0
-                      states = Set.insert 0 s1
-                      incN1T = fmap (fmap (+1)) $ 
-                                Map.mapKeys (\(a,b) -> (a + 1,b)) (ntransition n1)
-                      incN2T = fmap (fmap (+ firstQStateN2)) $
-                                Map.mapKeys (\(a,b) -> (a + firstQStateN2,b)) (ntransition n2)
-                      u0 = Map.union incN1T incN2T
-                      u1 = Map.insert (0, Nothing) (Set.fromList [1, firstQStateN2]) u0
-                      u2 = Map.insert (lastQStateN1, Nothing) (Set.singleton lastQStateUnion) u1
-                      transitions = Map.insert 
-                                      (lastQStateN2, Nothing) 
-                                      (Set.singleton lastQStateUnion) 
-                                      u2
-                      accepts = Set.singleton lastQStateUnion
-                      in NFA {nstart = 0, 
-                              nstates = states,
-                              naccept = accepts,
-                              ntransition = transitions, 
-                              nalphabet = ab}
+  | n1 == n2 = n1 
+  | n1 == emptySetNfa (nalphabet n1) = n2 
+  | n2 == emptySetNfa (nalphabet n2) = n1 
+  | otherwise = let ab = nalphabet n1 `unionAlpha` nalphabet n2
+                    lastQStateN1 = Set.size (nstates n1)
+                    firstQStateN2 = lastQStateN1 + 1
+                    lastQStateN2 = lastQStateN1 + Set.size (nstates n2)
+                    lastQStateUnion = lastQStateN2 + 1
+                    s0 = Set.union 
+                          (fmap (+1) (nstates n1)) 
+                          (fmap (+ firstQStateN2) (nstates n2))
+                    s1 = Set.insert lastQStateUnion s0
+                    states = Set.insert 0 s1
+                    incN1T = fmap (fmap (+1)) $ 
+                              Map.mapKeys (\(a,b) -> (a + 1,b)) (ntransition n1)
+                    incN2T = fmap (fmap (+ firstQStateN2)) $
+                              Map.mapKeys (\(a,b) -> (a + firstQStateN2,b)) (ntransition n2)
+                    u0 = Map.union incN1T incN2T
+                    u1 = Map.insert (0, Nothing) (Set.fromList [1, firstQStateN2]) u0
+                    u2 = Map.insert (lastQStateN1, Nothing) (Set.singleton lastQStateUnion) u1
+                    transitions = Map.insert 
+                                    (lastQStateN2, Nothing) 
+                                    (Set.singleton lastQStateUnion) 
+                                    u2
+                    accepts = Set.singleton lastQStateUnion
+                    in NFA {nstart = 0, 
+                            nstates = states,
+                            naccept = accepts,
+                            ntransition = transitions, 
+                            nalphabet = ab}
 
 testUnionNfa :: Test
 testUnionNfa = TestList [
@@ -222,12 +229,12 @@ testUnionNfa = TestList [
                                   ((3, Just 'b'), (Set.singleton 4)),
                                   ((2,Nothing), (Set.singleton 5)),
                                   ((4,Nothing), (Set.singleton 5))],
-      nalphabet = Set.fromList "ab"
+      nalphabet = NonEmpty.fromList "ab"
     }]
 
 concatNfa :: NFA -> NFA -> NFA
 concatNfa n1 n2 =
-  let ab = Set.union (nalphabet n1) (nalphabet n2)
+  let ab = nalphabet n1 `unionAlpha` nalphabet n2
       firstQStateN2 = (Set.size (nstates n1))
       lastQStateN1 = firstQStateN2 - 1
       states = Set.union 
@@ -254,7 +261,7 @@ testConcatNfa = TestList [
       ntransition = Map.fromList [((0, Just 'a'), (Set.singleton 1)),
                                   ((2, Just 'b'), (Set.singleton 3)),
                                   ((1,Nothing), (Set.singleton 2))],
-      nalphabet = Set.fromList "ab"
+      nalphabet = NonEmpty.fromList "ab"
     },
   (concatNfa 
     (unionNfa (singleCharNfa 'a') (singleCharNfa 'b')) 
@@ -270,7 +277,7 @@ testConcatNfa = TestList [
                                   ((2,Nothing), (Set.singleton 5)),
                                   ((4,Nothing), (Set.singleton 5)),
                                   ((5,Nothing), (Set.singleton 6))],
-      nalphabet = Set.fromList "ab"
+      nalphabet = NonEmpty.fromList "ab"
     }]
 
 kleeneNfa :: NFA -> NFA
@@ -301,7 +308,7 @@ testKleeneNfa = TestList [
       ntransition = Map.fromList [((0,Nothing), Set.fromList [1,3]),
                                   ((1,Just 'a'), Set.fromList [2]),
                                   ((2,Nothing), Set.fromList [1,3])],
-      nalphabet = Set.fromList "a"},
+      nalphabet = NonEmpty.fromList "a"},
   kleeneNfa (concatNfa (singleCharNfa 'a') (singleCharNfa 'b')) ~?= 
      NFA {nstart = 0, 
           nstates = Set.fromList [0,1,2,3,4,5],
@@ -311,7 +318,7 @@ testKleeneNfa = TestList [
                                       ((2,Nothing),Set.fromList [3]),
                                       ((3,Just 'b'),Set.fromList [4]),
                                       ((4,Nothing),Set.fromList [1,5])],
-          nalphabet = Set.fromList "ab"}] 
+          nalphabet = NonEmpty.fromList "ab"}] 
 
 main :: IO ()
 main = do

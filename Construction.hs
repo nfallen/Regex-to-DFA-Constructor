@@ -1,12 +1,16 @@
 module Construction where
 
 import Regex
+import Alpha
 import Automata
 import DFA
 import NFA
 
 import Data.List
 import qualified Data.List as List
+
+import Data.List.NonEmpty as NonEmpty
+
 import Control.Monad.State
 
 import Data.Map (Map)
@@ -26,30 +30,25 @@ thompsonConstruction regexp = let nfa = thompsonNfaConstruction regexp
                               in dfaConstruction nfa
 
 thompsonNfaConstruction :: RegExp -> NFA
-thompsonNfaConstruction Empty = emptyStringNfa (defaultAlpha)
-thompsonNfaConstruction Void = emptySetNfa (defaultAlpha)
-thompsonNfaConstruction (Var s) = case (P.parse regexParser "" s) of 
-                                    Left err -> emptySetNfa (Set.empty :: Set Char) --creates the void nfa upon invalid string input
-                                    Right regexp -> thompsonNfaConstruction regexp 
-thompsonNfaConstruction (Char c) =  unionList clist where clist = Set.toList c
-thompsonNfaConstruction (Alt r1 r2) = unionNfa (thompsonNfaConstruction r1) (thompsonNfaConstruction r2) 
-thompsonNfaConstruction (Seq r1 r2) = concatNfa (thompsonNfaConstruction r1) (thompsonNfaConstruction r2) 
-thompsonNfaConstruction (Star r) = kleeneNfa (thompsonNfaConstruction r)
-
-unionList (x:xs) = unionNfa (singleCharNfa x) (thompsonNfaConstruction (rChar $ Set.fromList xs))   
-unionList [] = emptySetNfa (Set.empty :: Set Char)
+thompsonNfaConstruction r = construction r (alpha r) where
+  construction Empty ab = emptyStringNfa ab
+  construction Void  ab = emptySetNfa ab
+  construction (Char cs) ab = foldr1 (\n1 n2 -> unionNfa n1 n2) (singleCharNfa <$> cs)
+  construction (Alt r1 r2) ab = unionNfa (construction r1 ab) (construction r2 ab) 
+  construction (Seq r1 r2) ab = concatNfa (construction r1 ab) (construction r2 ab) 
+  construction (Star r) ab = kleeneNfa (construction r ab)
 
 testThompsonNfaConstruction :: Test
 testThompsonNfaConstruction = TestList [
-  thompsonNfaConstruction (rChar $ Set.singleton 'a') ~?= 
+  thompsonNfaConstruction (rChar "a") ~?= 
     NFA {
     nstart = 0,
     nstates = Set.fromList [0,1],
     naccept = Set.singleton 1,
     ntransition = Map.fromList [((0,Just 'a'), Set.singleton 1)],
-    nalphabet = Set.singleton 'a'
+    nalphabet = return 'a'
   },
-  thompsonNfaConstruction (rStar (rSeq (rChar $ Set.singleton 'a') (rChar $ Set.singleton 'b'))) ~?= 
+  thompsonNfaConstruction (rStar (rSeq (rChar "a") (rChar "b"))) ~?= 
     NFA {
       nstart = 0,
       nstates = Set.fromList [0,1,2,3,4,5],
@@ -60,10 +59,10 @@ testThompsonNfaConstruction = TestList [
                                   ((4, Just 'b'), (Set.singleton 5)),
                                   ((4, Nothing), (Set.fromList [5,1])),
                                   ((3,Nothing), (Set.singleton 4))],
-      nalphabet = Set.fromList "ab"
+      nalphabet = NonEmpty.fromList "ab"
     },
-    thompsonNfaConstruction (rAlt (rStar (rSeq (rChar $ Set.singleton 'a') (rChar $ Set.singleton 'b'))) 
-                  (rStar (rSeq (rChar $ Set.singleton 'a') (rChar $ Set.singleton 'b')))) ~?= 
+    thompsonNfaConstruction (rAlt (rStar (rSeq (rChar "a") (rChar "b"))) 
+                  (rStar (rSeq (rChar "a") (rChar "b")))) ~?= 
     NFA {
       nstart = 0,
       nstates = Set.fromList [0,1,2,3,4,5],
@@ -74,9 +73,9 @@ testThompsonNfaConstruction = TestList [
                                   ((4, Just 'b'), (Set.singleton 5)),
                                   ((4, Nothing), (Set.fromList [5,1])),
                                   ((3,Nothing), (Set.singleton 4))],
-      nalphabet = Set.fromList "ab"
+      nalphabet = NonEmpty.fromList "ab"
     },
-    thompsonNfaConstruction (rAlt (rChar $ Set.singleton 'a') (rChar $ Set.singleton 'b')) ~?=
+    thompsonNfaConstruction (rAlt (rChar "a") (rChar "b")) ~?=
     NFA {
       nstart = 0,
       nstates = Set.fromList [0,1,2,3,4,5],
@@ -86,7 +85,7 @@ testThompsonNfaConstruction = TestList [
                                   ((3, Just 'b'), (Set.singleton 4)),
                                   ((2,Nothing), (Set.singleton 5)),
                                   ((4,Nothing), (Set.singleton 5))],
-      nalphabet = Set.fromList "ab"
+      nalphabet = NonEmpty.fromList "ab"
     }] 
 
 data DFASt a = DFASt { qStateCounter :: Int, 
@@ -132,7 +131,7 @@ dfaStateConstruction :: NFA -> Maybe (Set QState) -> State (DFASt (Set QState)) 
 dfaStateConstruction nfa Nothing = return ()
 dfaStateConstruction nfa (Just nq) = do
       dst <- get
-      let alpha = Set.toList $ nalphabet nfa
+      let alpha = nalphabet nfa
       let qCharPairs = (\c -> (nq,c)) <$> alpha
       let next nq c = epsilonReachable nfa (symbolReachable nfa nq c)
       nq's <- sequence $ addTransition next <$> qCharPairs
@@ -163,7 +162,7 @@ testDfaConstruction = TestList [
          dstates = Set.fromList [0,1,2],
          daccept = Set.fromList [1],
          dtransition = Map.fromList [((0,'a'),1),((1,'a'),2),((2,'a'),2)],
-         dalphabet = Set.fromList "a"},
+         dalphabet = return 'a'},
   dfaConstruction (unionNfa (singleCharNfa 'a') (singleCharNfa 'b')) ~?= 
     DFA {dstart = 0,
          dstates = Set.fromList [0,1,2,3],
@@ -176,13 +175,7 @@ testDfaConstruction = TestList [
                                      ((2,'b'),2),
                                      ((3,'a'),2),
                                      ((3,'b'),2)],
-         dalphabet = Set.fromList "ab"}]
-
--- return True when r matches the empty string
-nullable :: RegExp -> Bool
-nullable Empty  = True
-nullable (Star _) = True
-nullable _      = False
+         dalphabet = NonEmpty.fromList "ab"}]
 
 dfaMinimization :: DFA -> DFA
 dfaMinimization d = mergePair (deleteUnreachable d (Set.toList (dstates d))) 
@@ -193,13 +186,13 @@ excessDFA = DFA {dstart = 0,
                  daccept = Set.fromList [2,3,4],
                  dtransition = Map.fromList [((0,'0'),1),((0,'1'),2),((1,'0'),0),((1,'1'),3),((2,'0'),4),
                                              ((2,'1'),5),((3,'0'),4),((3,'1'),5),((4,'0'),4),((4,'1'),5),((5,'0'),5),((5,'1'),5)],
-                 dalphabet = Set.fromList ['0','1']}  
+                 dalphabet = NonEmpty.fromList "01"}  
 
 unreachableDFA = DFA {dstart = 0,
                       dstates = Set.fromList [0,1],
                       daccept = Set.empty,
                       dtransition = Map.fromList[((1,'a'),0),((1,'b'),0)],
-                      dalphabet = Set.fromList ['a','b']} 
+                      dalphabet = NonEmpty.fromList "ab"} 
 
 unreachableDFA2 =  DFA {dstart = 0, 
                         dstates = Set.fromList [0,1,2,4,5,6],
@@ -207,7 +200,7 @@ unreachableDFA2 =  DFA {dstart = 0,
                         dtransition = Map.fromList [((0,'0'),1),((0,'1'),2),((1,'0'),0),((1,'1'),3),((2,'0'),4),
                                              ((2,'1'),5),((3,'0'),4),((3,'1'),5),((4,'0'),4),((4,'1'),5),((5,'0'),5),((5,'1'),5),
                                              ((6,'1'),5),((6,'0'),6)],
-                        dalphabet = Set.fromList ['0','1']}                            
+                        dalphabet = NonEmpty.fromList "01"}                            
 
 -- TODO: more tests
 testDfaMinimization :: Test
@@ -218,7 +211,7 @@ testDfaMinimization = "Resulting DFA is minimized" ~:
          dstates = Set.fromList [0,2,5],
          daccept = Set.fromList [2],
          dtransition = Map.fromList [((0,'0'),0),((0,'1'),2),((2,'0'),2),((2,'1'),5),((5,'0'),5),((5,'1'),5)],
-         dalphabet = Set.fromList ['0','1']}
+         dalphabet = NonEmpty.fromList "01"}
   ]
 
 deleteUnreachable :: DFA -> [QState] -> DFA
@@ -321,8 +314,7 @@ testIndistinct = "Determines if states are indistinct" ~:
   TestList[
     indistinct excessDFA 2 3 ~?= True,
     indistinct excessDFA 1 2 ~?= False,
-    indistinct excessDFA 3 5 ~?= False,
-  ]
+    indistinct excessDFA 3 5 ~?= False]
 
 iterateAlphabet :: [Char] -> DFA -> QState -> QState -> Bool
 iterateAlphabet [] d1 s1 d2 = True 
@@ -332,12 +324,19 @@ iterateAlphabet (x:xs) d1 s1 s2 = case (Map.lookup (s1,x) (dtransition d1)) of
                                                           _ -> False 
                                         _ -> False 
 
+
+-- return True when r matches the empty string
+nullable :: RegExp -> Bool
+nullable Empty  = True
+nullable (Star _) = True
+nullable _      = False
+
 -- |  Takes a regular expression `r` and a character `c`,
 -- and computes a new regular expression that accepts word `w` if `cw` is
 -- accepted by `r`.
 deriv :: RegExp -> Char -> RegExp
 deriv Empty c                = Void
-deriv (Char cs) c            = if Set.member c cs then Empty else Void
+deriv (Char cs) c            = if elem c cs then Empty else Void
 deriv (Alt Empty r2) c       = deriv r2 c
 deriv (Alt r1 Empty) c       = deriv r1 c
 deriv (Alt r1 r2) c          = rAlt (deriv r1 c) (deriv r2 c)

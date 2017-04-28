@@ -3,7 +3,7 @@
 
 -- https://wiki.haskell.org/A_practical_Template_Haskell_Tutorial#Template_Haskell_for_building_Embedded_Domain_specific_Languages_.28EDSLs.29
 
-module Regex (regex, RegExp(Empty, Void, Var), 
+module Regex (regex, RegExp(Empty, Void), 
               pattern Char, pattern Alt, pattern Seq, pattern Star, 
               rAlt, rSeq, rStar, rChar, regexParser) where
 
@@ -11,6 +11,11 @@ import Prelude
 
 import Data.Set.Monad (Set)
 import qualified Data.Set.Monad as Set (singleton, empty, fromList, toList, member, delete)
+
+import Data.List (nub)
+
+import Data.List.NonEmpty (nonEmpty, NonEmpty) 
+import qualified Data.List.NonEmpty as NonEmpty (fromList, toList)
 
 import Data.Generics
 
@@ -31,13 +36,13 @@ pattern Alt a1 a2 <- AltExp a1 a2
 pattern Seq a1 a2 <- SeqExp a1 a2
 pattern Star a <- StarExp a
 
-data RegExp = CharExp (Set Char)      -- single literal character
-            | AltExp RegExp RegExp    -- r1 | r2   (alternation)
-            | SeqExp RegExp RegExp    -- r1 r2     (concatenation)
-            | StarExp RegExp          -- r*        (Kleene star)
-            | Empty                   -- ε, accepts empty string
-            | Void                    -- ∅, always fails
-            | Var String              -- a variable holding another regexp
+data RegExp = CharExp (NonEmpty Char)      -- single literal character
+            | AltExp RegExp RegExp -- r1 | r2   (alternation)
+            | SeqExp RegExp RegExp -- r1 r2     (concatenation)
+            | StarExp RegExp       -- r*        (Kleene star)
+            | Empty                -- ε, accepts empty string
+            | Void                 -- ∅, always fails
+            | Var String           -- a variable holding another regexp
   deriving (Show, Eq, Ord)
 
 rAlt :: RegExp -> RegExp -> RegExp
@@ -60,10 +65,10 @@ rStar Empty    = Empty -- iterating the empty string is the empty string
 rStar Void     = Empty -- zero or more occurrences of void is empty
 rStar r        = StarExp r -- no optimization
 
-rChar :: Set Char -> RegExp
-rChar cs 
-  | cs == Set.empty = Empty
-  | otherwise = CharExp cs
+rChar :: [Char] -> RegExp
+rChar cs  = case nonEmpty (nub cs) of
+  Nothing -> Empty
+  Just ne -> CharExp ne
 
 regex :: QuasiQuoter
 regex = QuasiQuoter {
@@ -86,8 +91,8 @@ regexParser = alts <* eof where
   atom       = try var P.<|> char
   var        = Var <$> (string "${" *> many1 (noneOf "}") <* P.char '}')
   char       = charclass P.<|> singlechar
-  singlechar = (rChar . Set.singleton) <$> noneOf specials
-  charclass  = fmap (rChar . Set.fromList) $
+  singlechar = (rChar . (:[])) <$> noneOf specials
+  charclass  = fmap rChar $
                  P.char '[' *> content <* P.char ']'
   content    = try (concat <$> many1 range)
                  P.<|> many1 (noneOf specials)
@@ -101,8 +106,8 @@ regexParser = alts <* eof where
                  P.<|> atom
   specials   = "[]()*|"
 
-instance (Ord a, Lift a) => Lift (Set a) where 
-  lift set = TH.appE (TH.varE 'Set.fromList) (lift (Set.toList set))
+instance (Ord a, Lift a) => Lift (NonEmpty a) where 
+  lift ne = TH.appE (TH.varE 'NonEmpty.fromList) (lift (NonEmpty.toList ne))
 
 instance Lift RegExp where
   -- lift :: RegExp -> Q Exp
