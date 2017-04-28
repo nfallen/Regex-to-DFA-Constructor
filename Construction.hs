@@ -192,11 +192,37 @@ dfaMinimization :: DFA -> DFA
 dfaMinimization d = mergePair (deleteUnreachable d (Set.toList (dstates d))) 
                               $ allPairs $ Set.toList $ dstates d
 
+excessDFA = DFA {dstart = 0, 
+                 dstates = Set.fromList [0,1,2,4,5],
+                 daccept = Set.fromList [2,3,4],
+                 dtransition = Map.fromList [((0,'0'),1),((0,'1'),2),((1,'0'),0),((1,'1'),3),((2,'0'),4),
+                                             ((2,'1'),5),((3,'0'),4),((3,'1'),5),((4,'0'),4),((4,'1'),5),((5,'0'),5),((5,'1'),5)],
+                 dalphabet = Set.fromList ['0','1']}  
+
+unreachableDFA = DFA {dstart = 0,
+                      dstates = Set.fromList [0,1],
+                      daccept = Set.empty,
+                      dtransition = Map.fromList[((1,'a'),0),((1,'b'),0)],
+                      dalphabet = Set.fromList ['a','b']} 
+
+unreachableDFA2 =  DFA {dstart = 0, 
+                        dstates = Set.fromList [0,1,2,4,5,6],
+                        daccept = Set.fromList [2,3,4],
+                        dtransition = Map.fromList [((0,'0'),1),((0,'1'),2),((1,'0'),0),((1,'1'),3),((2,'0'),4),
+                                             ((2,'1'),5),((3,'0'),4),((3,'1'),5),((4,'0'),4),((4,'1'),5),((5,'0'),5),((5,'1'),5),
+                                             ((6,'1'),5),((6,'0'),6)],
+                        dalphabet = Set.fromList ['0','1']}                            
+
 -- TODO: more tests
-testdfaMinimization :: Test
-testdfaMinimization = "Resulting DFA is minimized" ~:
+testDfaMinimization :: Test
+testDfaMinimization = "Resulting DFA is minimized" ~:
   TestList[
-    
+    dfaMinimization (excessDFA) ~?= 
+    DFA {dstart = 0, 
+         dstates = Set.fromList [0,2,5],
+         daccept = Set.fromList [2],
+         dtransition = Map.fromList [((0,'0'),0),((0,'1'),2),((2,'0'),2),((2,'1'),5),((5,'0'),5),((5,'1'),5)],
+         dalphabet = Set.fromList ['0','1']}
   ]
 
 deleteUnreachable :: DFA -> [QState] -> DFA
@@ -209,23 +235,44 @@ deleteUnreachable d @states(x:xs) = if ((not $ inwardTransition x $ dtransition 
                                                                  dalphabet = dalphabet d }) xs 
                                     else deleteUnreachable d xs 
 
--- TODO: more tests
-testdeleteUnreachable :: Test
-testdeleteUnreachable = "Unreachable states deleted from resulting DFA" ~:
+testDeleteUnreachable :: Test
+testDeleteUnreachable = "Unreachable states deleted from resulting DFA" ~:
   TestList[
-    
+    deleteUnreachable (unreachableDFA) (Set.toList $ dstates unreachableDFA) ~?= emptySetDfa (Set.fromList ['a','b']),
+    deleteUnreachable (unreachableDFA2) (Set.toList $ dstates unreachableDFA2) ~?= excessDFA 
   ]
 
 
 deleteKey :: QState -> [((QState, Char), QState)] -> [((QState, Char), QState)] 
 deleteKey k translist = List.filter (\((a,b),c) -> not (a == k)) translist 
 
+testDeleteKey :: Test
+testDeleteKey = "Deletes matching keys" ~:
+  TestList[
+    deleteKey 3 [((3,'a'),2)] ~?= [],
+    deleteKey 3 [((3,'a'),2),((3,'b'),1),((2,'a'),3)] ~?= [((2,'a'),3)],
+    deleteKey 3 [((2,'a'),4),((3,'a'),2)] ~?= [((2,'a'),4)]
+  ]
+
 replaceInwardTransitions :: QState -> QState-> [((QState, Char), QState)] -> [((QState, Char), QState)] 
 replaceInwardTransitions k1 k2 translist = List.map (\((a,b),c) -> ((a,b),k2)) 
                                            $ List.filter (\((a,b),c) -> (c == k1)) translist                                  
 
 inwardTransition :: QState -> Dtransition -> Bool 
-inwardTransition s transmap = elem s (Map.elems transmap)  
+inwardTransition s transmap = elem s (Map.elems $ Map.filterWithKey (\(k,_) _ -> k /= s) transmap) 
+
+testInwardTransition :: Test 
+testInwardTransition = "Identifies inward transition correctly" ~:
+  TestList[
+  inwardTransition 3 (Map.fromList [((2,'0'),3)]) ~?= True, 
+  inwardTransition 3 (Map.fromList [((3,'0'),2)]) ~?= False,
+  inwardTransition 3 (Map.fromList []) ~?= False,
+  inwardTransition 3 (Map.fromList[((2,'0'),1)]) ~?= False,
+  inwardTransition 3 (Map.fromList [((2,'0'),3),((2,'1'),3)]) ~?= True,
+  inwardTransition 3 (Map.fromList [((2,'0'),5),((2,'1'),3)]) ~?= True,
+  inwardTransition 3 (Map.fromList [((2,'0'),5),((2,'1'),3),((2,'2'),1)]) ~?= True,
+  inwardTransition 3 (Map.fromList [((2,'0'),5),((2,'1'),4)]) ~?= False
+  ]
 
 allPairs :: [QState] -> [(QState,QState)]
 allPairs states = [(s1,s2) | s1 <- states, s2 <- states, s1 < s2]
@@ -257,6 +304,7 @@ indistinct d1 s1 s2 = if (((Set.member s1 $ daccept d1) && not (Set.member s2 $ 
                                                                  where alist = Set.toList $ dalphabet d1 
 
 iterateAlphabet :: [Char] -> DFA -> QState -> QState -> Bool
+iterateAlphabet [] d1 s1 d2 = True 
 iterateAlphabet (x:xs) d1 s1 s2 = case (Map.lookup (s1,x) (dtransition d1)) of 
                                         Just a -> case (Map.lookup (s2,x) (dtransition d1)) of 
                                                           Just b -> a == b && iterateAlphabet xs d1 s1 s2 
@@ -287,5 +335,6 @@ brzozowskiConstruction = undefined
 
 main :: IO ()
 main = do
-    runTestTT $ TestList [testDfaConstruction, testThompsonNfaConstruction]
+    runTestTT $ TestList [testDfaConstruction, testThompsonNfaConstruction,testDfaMinimization,
+                          testDeleteUnreachable, testInwardTransition, testDeleteKey]
     return ()
