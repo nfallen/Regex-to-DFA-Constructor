@@ -153,11 +153,19 @@ testEqDFA = "test isomorphic DFA" ~:
   let ab = Set.fromList ['0', '1']
       d1 = sigmaStarDfa ab
       d2 = emptySetDfa ab
+      excessDFA = DFA {dstart = 0, 
+             dstates = Set.fromList [0,1,2,4,5], 
+             daccept = Set.fromList [2,3,4], 
+             dtransition = Map.fromList [((0,'0'),1),((0,'1'),2),((1,'0'),0),
+             ((1,'1'),3),((2,'0'),4),((2,'1'),5),((3,'0'),4),
+             ((3,'1'),5),((4,'0'),4),((4,'1'),5),((5,'0'),5),((5,'1'),5)], 
+             dalphabet = Set.fromList "01"}
       in TestList[
         d1 == d1 ~?= True,
         d2 == d2 ~?= True,
         d1 == d2 ~?= False,
-        d2 == d1 ~?= False
+        d2 == d1 ~?= False,
+        excessDFA == excessDFA ~?= True
       ]
 
 main :: IO ()

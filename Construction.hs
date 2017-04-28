@@ -193,7 +193,7 @@ dfaMinimization d = mergePair (deleteUnreachable d (Set.toList (dstates d)))
                               $ allPairs $ Set.toList $ dstates d
 
 excessDFA = DFA {dstart = 0, 
-                 dstates = Set.fromList [0,1,2,4,5],
+                 dstates = Set.fromList [0,1,2,3,4,5],
                  daccept = Set.fromList [2,3,4],
                  dtransition = Map.fromList [((0,'0'),1),((0,'1'),2),((1,'0'),0),((1,'1'),3),((2,'0'),4),
                                              ((2,'1'),5),((3,'0'),4),((3,'1'),5),((4,'0'),4),((4,'1'),5),((5,'0'),5),((5,'1'),5)],
@@ -254,17 +254,8 @@ testDeleteKey = "Deletes matching keys" ~:
     deleteKey 3 [((2,'a'),4),((3,'a'),2)] ~?= [((2,'a'),4)]
   ]
 
-replaceInwardTransitions :: QState -> QState-> [((QState, Char), QState)] -> [((QState, Char), QState)] 
-replaceInwardTransitions k1 k2 translist = List.map (\((a,b),c) -> ((a,b),k2)) 
-                                           $ List.filter (\((a,b),c) -> (c == k1)) translist   
-
-testReplaceInwardTransitions :: Test
-testReplaceInwardTransitions = "Replaces inward transitions" ~:
-  TestList[
-    replaceInwardTransitions 0 1 [((3,'a'),0),((4,'b'),1),((2,'a'),1)] ~?= [((3,'a'),1)],
-    replaceInwardTransitions 0 1 [((3,'a'),1)] ~?= [],
-    replaceInwardTransitions 0 1 [((3,'a'),1),((4,'b'),0),((2,'a'),1)] ~?= [((4,'b'),1)]
-  ]
+deleteValue :: QState -> [((QState, Char), QState)] -> [((QState, Char), QState)] 
+deleteValue k translist = List.filter (\((a,b),c) -> not (c == k)) translist 
 
 inwardTransition :: QState -> Dtransition -> Bool 
 inwardTransition s transmap = elem s (Map.elems $ Map.filterWithKey (\(k,_) _ -> k /= s) transmap) 
@@ -301,15 +292,30 @@ mergePair d (x:xs) =  let newd = mergeIndistinct d (fst x) (snd x) in
                           then mergePair d xs -- try next pair in dfa d
                           else mergePair newd xs 
 
+addOutward :: QState -> QState-> [((QState, Char), QState)] -> [((QState, Char), QState)] 
+addOutward s1 s2 translist = translist ++ (List.map (\((a,b),c) -> ((a,b),s1)) $
+                            List.filter (\((a,b),c) -> (c == s2)) translist) 
+
 mergeIndistinct :: DFA -> QState -> QState -> DFA
 mergeIndistinct d x1 x2 = if indistinct d x1 x2 
                           then  DFA {dstart = dstart d,
                                      dstates = Set.delete x2 (dstates d),
-                                     daccept = daccept d,  
-                                     dtransition = Map.union (Map.fromList (deleteKey x2 (Map.toList (dtransition d))))
-                                                   $ Map.fromList $ replaceInwardTransitions x2 x1 $ Map.toList $ dtransition d, 
+                                     daccept = Set.delete x2 $ daccept d,  
+                                     dtransition = Map.fromList (addOutward x1 x2 $ 
+                                                   deleteKey x2 (Map.toList (dtransition d))), 
                                      dalphabet = dalphabet d}
                           else d 
+
+testMergeIndistinct :: Test
+testMergeIndistinct = "Merges indistinct states" ~:
+  TestList[
+    mergeIndistinct excessDFA 2 3 ~?= DFA {dstart = 0, 
+                 dstates = Set.fromList [0,1,2,4,5],
+                 daccept = Set.fromList [2,4],
+                 dtransition = Map.fromList [((0,'0'),1),((0,'1'),2),((1,'0'),0),((1,'1'),2),((2,'0'),4),
+                                             ((2,'1'),5),((4,'0'),4),((4,'1'),5),((5,'0'),5),((5,'1'),5)],
+                 dalphabet = Set.fromList ['0','1']}  
+  ]
 
 indistinct :: DFA -> QState -> QState -> Bool
 indistinct d1 s1 s2 = if (((Set.member s1 $ daccept d1) && not (Set.member s2 $ daccept d1)) ||
@@ -325,7 +331,7 @@ testIndistinct = "Determines if states are indistinct" ~:
   TestList[
     indistinct excessDFA 2 3 ~?= True,
     indistinct excessDFA 1 2 ~?= False,
-    indistinct excessDFA 3 5 ~?= False,
+    indistinct excessDFA 3 5 ~?= False
   ]
 
 iterateAlphabet :: [Char] -> DFA -> QState -> QState -> Bool
@@ -361,6 +367,6 @@ brzozowskiConstruction = undefined
 main :: IO ()
 main = do
     runTestTT $ TestList [testDfaConstruction, testThompsonNfaConstruction,testDfaMinimization,
-                          testDeleteUnreachable, testInwardTransition, testDeleteKey, testReplaceInwardTransitions,
-                          testAllPairs, testIndistinct]
+                          testDeleteUnreachable, testInwardTransition, testDeleteKey,
+                          testAllPairs, testIndistinct, testMergeIndistinct]
     return ()
