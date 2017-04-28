@@ -239,7 +239,7 @@ testDeleteUnreachable :: Test
 testDeleteUnreachable = "Unreachable states deleted from resulting DFA" ~:
   TestList[
     deleteUnreachable (unreachableDFA) (Set.toList $ dstates unreachableDFA) ~?= emptySetDfa (Set.fromList ['a','b']),
-    deleteUnreachable (unreachableDFA2) (Set.toList $ dstates unreachableDFA2) ~?= excessDFA 
+    deleteUnreachable (unreachableDFA2) (Set.toList $ dstates unreachableDFA2) ~?= excessDFA --TODO: why is this failing?! 
   ]
 
 
@@ -256,7 +256,15 @@ testDeleteKey = "Deletes matching keys" ~:
 
 replaceInwardTransitions :: QState -> QState-> [((QState, Char), QState)] -> [((QState, Char), QState)] 
 replaceInwardTransitions k1 k2 translist = List.map (\((a,b),c) -> ((a,b),k2)) 
-                                           $ List.filter (\((a,b),c) -> (c == k1)) translist                                  
+                                           $ List.filter (\((a,b),c) -> (c == k1)) translist   
+
+testReplaceInwardTransitions :: Test
+testReplaceInwardTransitions = "Replaces inward transitions" ~:
+  TestList[
+    replaceInwardTransitions 0 1 [((3,'a'),0),((4,'b'),1),((2,'a'),1)] ~?= [((3,'a'),1)],
+    replaceInwardTransitions 0 1 [((3,'a'),1)] ~?= [],
+    replaceInwardTransitions 0 1 [((3,'a'),1),((4,'b'),0),((2,'a'),1)] ~?= [((4,'b'),1)]
+  ]
 
 inwardTransition :: QState -> Dtransition -> Bool 
 inwardTransition s transmap = elem s (Map.elems $ Map.filterWithKey (\(k,_) _ -> k /= s) transmap) 
@@ -264,18 +272,27 @@ inwardTransition s transmap = elem s (Map.elems $ Map.filterWithKey (\(k,_) _ ->
 testInwardTransition :: Test 
 testInwardTransition = "Identifies inward transition correctly" ~:
   TestList[
-  inwardTransition 3 (Map.fromList [((2,'0'),3)]) ~?= True, 
-  inwardTransition 3 (Map.fromList [((3,'0'),2)]) ~?= False,
-  inwardTransition 3 (Map.fromList []) ~?= False,
-  inwardTransition 3 (Map.fromList[((2,'0'),1)]) ~?= False,
-  inwardTransition 3 (Map.fromList [((2,'0'),3),((2,'1'),3)]) ~?= True,
-  inwardTransition 3 (Map.fromList [((2,'0'),5),((2,'1'),3)]) ~?= True,
-  inwardTransition 3 (Map.fromList [((2,'0'),5),((2,'1'),3),((2,'2'),1)]) ~?= True,
-  inwardTransition 3 (Map.fromList [((2,'0'),5),((2,'1'),4)]) ~?= False
+    inwardTransition 3 (Map.fromList [((2,'0'),3)]) ~?= True, 
+    inwardTransition 3 (Map.fromList [((3,'0'),2)]) ~?= False,
+    inwardTransition 3 (Map.fromList []) ~?= False,
+    inwardTransition 3 (Map.fromList[((2,'0'),1)]) ~?= False,
+    inwardTransition 3 (Map.fromList [((2,'0'),3),((2,'1'),3)]) ~?= True,
+    inwardTransition 3 (Map.fromList [((2,'0'),5),((2,'1'),3)]) ~?= True,
+    inwardTransition 3 (Map.fromList [((2,'0'),5),((2,'1'),3),((2,'2'),1)]) ~?= True,
+    inwardTransition 3 (Map.fromList [((2,'0'),5),((2,'1'),4)]) ~?= False
   ]
 
 allPairs :: [QState] -> [(QState,QState)]
 allPairs states = [(s1,s2) | s1 <- states, s2 <- states, s1 < s2]
+
+testAllPairs :: Test
+testAllPairs = "Returns all unique pairs in list" ~:
+  TestList[
+    allPairs [1,2,3,4,5] ~?= [(1,2),(1,3),(1,4),(1,5),(2,3),(2,4),(2,5),(3,4),(3,5),(4,5)],
+    allPairs [1] ~?= [],
+    allPairs [1,2] ~?= [(1,2)],
+    allPairs [] ~?= []
+  ]
 
 mergePair :: DFA -> [(QState,QState)] -> DFA
 mergePair d [] = d 
@@ -302,6 +319,14 @@ indistinct d1 s1 s2 = if (((Set.member s1 $ daccept d1) && not (Set.member s2 $ 
                            transitionsDistinct :: DFA -> QState -> QState -> Bool 
                            transitionsDistinct d1 s1 s2 = iterateAlphabet alist d1 s1 s2 
                                                                  where alist = Set.toList $ dalphabet d1 
+
+testIndistinct :: Test
+testIndistinct = "Determines if states are indistinct" ~:
+  TestList[
+    indistinct excessDFA 2 3 ~?= True,
+    indistinct excessDFA 1 2 ~?= False,
+    indistinct excessDFA 3 5 ~?= False,
+  ]
 
 iterateAlphabet :: [Char] -> DFA -> QState -> QState -> Bool
 iterateAlphabet [] d1 s1 d2 = True 
@@ -336,5 +361,6 @@ brzozowskiConstruction = undefined
 main :: IO ()
 main = do
     runTestTT $ TestList [testDfaConstruction, testThompsonNfaConstruction,testDfaMinimization,
-                          testDeleteUnreachable, testInwardTransition, testDeleteKey]
+                          testDeleteUnreachable, testInwardTransition, testDeleteKey, testReplaceInwardTransitions,
+                          testAllPairs, testIndistinct]
     return ()
