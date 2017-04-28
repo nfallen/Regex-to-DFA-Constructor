@@ -155,7 +155,7 @@ instance Eq NFA where
     && ntransition n1 == ntransition n2
     && nstart n1 == nstart n2
 
-singleCharNfa :: Char -> NFA --TODO: Change type signature to DFA when DFA converter is implemented 
+singleCharNfa :: Char -> NFA 
 singleCharNfa char = 
   let ab = Set.singleton char
       singleQStates = Set.fromList [0,1]
