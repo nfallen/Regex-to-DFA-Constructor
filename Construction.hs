@@ -239,7 +239,7 @@ testDeleteUnreachable :: Test
 testDeleteUnreachable = "Unreachable states deleted from resulting DFA" ~:
   TestList[
     deleteUnreachable (unreachableDFA) (Set.toList $ dstates unreachableDFA) ~?= emptySetDfa (Set.fromList ['a','b']),
-    deleteUnreachable (unreachableDFA2) (Set.toList $ dstates unreachableDFA2) ~?= excessDFA --TODO: why is this failing?! 
+    deleteUnreachable (unreachableDFA2) (Set.toList $ dstates unreachableDFA2) ~?= excessDFA 
   ]
 
 
@@ -253,9 +253,6 @@ testDeleteKey = "Deletes matching keys" ~:
     deleteKey 3 [((3,'a'),2),((3,'b'),1),((2,'a'),3)] ~?= [((2,'a'),3)],
     deleteKey 3 [((2,'a'),4),((3,'a'),2)] ~?= [((2,'a'),4)]
   ]
-
-deleteValue :: QState -> [((QState, Char), QState)] -> [((QState, Char), QState)] 
-deleteValue k translist = List.filter (\((a,b),c) -> not (c == k)) translist 
 
 inwardTransition :: QState -> Dtransition -> Bool 
 inwardTransition s transmap = elem s (Map.elems $ Map.filterWithKey (\(k,_) _ -> k /= s) transmap) 
@@ -290,7 +287,7 @@ mergePair d [] = d
 mergePair d (x:xs) =  let newd = mergeIndistinct d (fst x) (snd x) in
                           if (newd == d) 
                           then mergePair d xs -- try next pair in dfa d
-                          else mergePair newd xs 
+                          else mergePair newd $ allPairs $ Set.toList $ dstates newd
 
 addOutward :: QState -> QState-> [((QState, Char), QState)] -> [((QState, Char), QState)] 
 addOutward s1 s2 translist = translist ++ (List.map (\((a,b),c) -> ((a,b),s1)) $
@@ -338,7 +335,7 @@ iterateAlphabet :: [Char] -> DFA -> QState -> QState -> Bool
 iterateAlphabet [] d1 s1 d2 = True 
 iterateAlphabet (x:xs) d1 s1 s2 = case (Map.lookup (s1,x) (dtransition d1)) of 
                                         Just a -> case (Map.lookup (s2,x) (dtransition d1)) of 
-                                                          Just b -> a == b && iterateAlphabet xs d1 s1 s2 
+                                                          Just b -> (a == b || a == s2 || b == s1) && iterateAlphabet xs d1 s1 s2 
                                                           _ -> False 
                                         _ -> False 
 
