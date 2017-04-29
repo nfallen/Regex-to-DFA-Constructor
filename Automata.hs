@@ -6,6 +6,8 @@ module Automata where
 
 import Data.List as List
 
+import Data.List.NonEmpty as NonEmpty
+
 import Data.Set.Monad (Set)
 import qualified Data.Set.Monad as Set
 
@@ -14,12 +16,11 @@ import qualified Data.Map as Map
 
 import Test.HUnit (Test(..), (~:), (~?=), runTestTT, assertBool) 
 
+import Alpha
+
 type QState = Int
 
 type QStates = Set QState
-
-defaultAlpha :: Set Char
-defaultAlpha = Set.fromList "0"
 
 class Automata a where
   decideString :: a -> String -> Maybe Bool
@@ -28,7 +29,7 @@ class Automata a where
 stateBijections :: QStates -> QStates -> [Map QState QState]
 stateBijections s1 s2 = let xs = Set.toList s1 
                             perms = List.permutations (Set.toList s2) in 
-                            Map.fromList <$> (fmap (\perm -> zip xs perm) perms)
+                            Map.fromList <$> (fmap (\perm -> List.zip xs perm) perms)
 
 testBijections :: Test
 testBijections = "bijections" ~: 

@@ -1,8 +1,12 @@
 module DFA where
 
+import Alpha
+
 import Automata
 
 import Control.Monad
+
+import Data.List.NonEmpty as NonEmpty
 
 import Data.Maybe
 
@@ -21,11 +25,11 @@ data DFA = DFA {
                  dstates :: QStates, 
                  daccept :: QStates,
                  dtransition :: Dtransition, 
-                 dalphabet :: Set Char
+                 dalphabet :: Alpha
                } deriving (Show)
 
 -- DFA that accepts all strings
-sigmaStarDfa :: Set Char -> DFA
+sigmaStarDfa :: Alpha -> DFA
 sigmaStarDfa ab = DFA {dstart = 0, 
                        dstates = Set.singleton 0,
                        daccept = Set.singleton 0,
@@ -33,7 +37,7 @@ sigmaStarDfa ab = DFA {dstart = 0,
                        dalphabet = ab}
 
 -- DFA that rejects all strings
-emptySetDfa :: Set Char -> DFA
+emptySetDfa :: Alpha -> DFA
 emptySetDfa ab = DFA {dstart = 0,
                       dstates = Set.singleton 0,
                       daccept = Set.empty,
@@ -41,11 +45,11 @@ emptySetDfa ab = DFA {dstart = 0,
                       dalphabet = ab}
 
 -- DFA that accepts only the empty string
-emptyStringDfa :: Set Char -> DFA
+emptyStringDfa :: Alpha -> DFA
 emptyStringDfa ab = DFA {dstart = 0, 
                          dstates = Set.fromList [0,1],
                          daccept = Set.singleton 0,
-                         dtransition = Map.fromList [((0,s),1) | s <- Set.toList ab],
+                         dtransition = Map.fromList [((0,s),1) | s <- NonEmpty.toList ab],
                          dalphabet = ab}
 
 withQState :: QState -> DFA -> DFA
@@ -58,25 +62,27 @@ withTransition :: (QState, Char) -> QState -> DFA -> DFA
 withTransition qc q' dfa = dfa { dtransition = Map.insert qc q' (dtransition dfa) }
 
 instance Automata DFA where
-  decideString dfa s = decideStringFromQState dfa s (dstart dfa) where
-    decideStringFromQState dfa (c:cs) q 
-      | Set.member c (dalphabet dfa) = case Map.lookup (q,c) (dtransition dfa) of 
-                                         Just q'  -> decideStringFromQState dfa cs q'
-                                         Nothing  -> decideStringFromQState dfa cs q
-      | otherwise                    = Nothing
-    decideStringFromQState dfa [] q   = Just (Set.member q (daccept dfa))
+  decideString dfa s
+    | any (\c -> notElem c (dalphabet dfa)) s = Nothing
+    | otherwise = decideStringFromQState dfa s (dstart dfa)
+    where
+      decideStringFromQState dfa (c:cs) q =
+        case Map.lookup (q,c) (dtransition dfa) of 
+          Just q'  -> decideStringFromQState dfa cs q'
+          Nothing  -> decideStringFromQState dfa cs q
+      decideStringFromQState dfa [] q = Just (Set.member q (daccept dfa))
 
 -- TODO: more tests
 testDecideStringDfa :: Test
 testDecideStringDfa = "DFA decides strings correctly" ~:
-  let ab = Set.fromList "a" in
+  let ab = NonEmpty.fromList "ab" in
   TestList[
     decideString (emptySetDfa ab) "a" ~?= Just False,
     decideString (emptyStringDfa ab) "a" ~?= Just False,
     decideString (emptyStringDfa ab) "" ~?= Just True,
     decideString (sigmaStarDfa ab) "" ~?= Just True,
     decideString (sigmaStarDfa ab) "aaaaa" ~?= Just True,
-    decideString (sigmaStarDfa ab) "bbb" ~?= Nothing
+    decideString (sigmaStarDfa ab) "bbbc" ~?= Nothing
   ]
 
 -- We implement DFA equality as isomorphism.
@@ -98,7 +104,7 @@ startQStateSame m d1 d2 = case (Map.lookup (dstart d1) m) of
 
 testStartQStateSame :: Test
 testStartQStateSame = "start state same" ~: 
-  let ab = Set.fromList ['0', '1']
+  let ab = NonEmpty.fromList "01"
       d1 = sigmaStarDfa ab
       d2 = emptySetDfa ab
       m = Map.fromList [(0,0)]
@@ -122,7 +128,7 @@ transitionsSame m d1 d2 = all (\q -> all (\s -> equivTransition q s m) (dalphabe
 
 testTransitionsSame :: Test
 testTransitionsSame = "transitions same" ~: 
-  let ab = Set.fromList ['0', '1']
+  let ab = NonEmpty.fromList "01"
       d1 = sigmaStarDfa ab
       d2 = emptySetDfa ab
       m = Map.fromList [(0,0)]
@@ -137,7 +143,7 @@ acceptQStatesSame m d1 d2 = all (\(q1,q2) -> equivAccept q1 q2) (Map.toList m)
 
 testAcceptQStatesSame :: Test
 testAcceptQStatesSame = "accept states same" ~: 
-  let ab = Set.fromList ['0', '1']
+  let ab = NonEmpty.fromList "01"
       d1 = sigmaStarDfa ab
       d2 = emptySetDfa ab
       m = Map.fromList [(0,0)]
@@ -150,16 +156,16 @@ testAcceptQStatesSame = "accept states same" ~:
 -- TODO: more tests!
 testEqDFA :: Test
 testEqDFA = "test isomorphic DFA" ~: 
-  let ab = Set.fromList ['0', '1']
+  let ab = NonEmpty.fromList "01"
       d1 = sigmaStarDfa ab
       d2 = emptySetDfa ab
       excessDFA = DFA {dstart = 0, 
-             dstates = Set.fromList [0,1,2,4,5], 
+             dstates = Set.fromList [0,1,2,3,4,5], 
              daccept = Set.fromList [2,3,4], 
              dtransition = Map.fromList [((0,'0'),1),((0,'1'),2),((1,'0'),0),
              ((1,'1'),3),((2,'0'),4),((2,'1'),5),((3,'0'),4),
              ((3,'1'),5),((4,'0'),4),((4,'1'),5),((5,'0'),5),((5,'1'),5)], 
-             dalphabet = Set.fromList "01"}
+             dalphabet = NonEmpty.fromList "01"}
       in TestList[
         d1 == d1 ~?= True,
         d2 == d2 ~?= True,

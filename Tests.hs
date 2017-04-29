@@ -6,10 +6,13 @@ module Tests where
 import Prelude
 
 import Regex
+import Alpha
 import Automata
 import DFA
 import NFA
 import Construction
+
+import Data.List.NonEmpty as NonEmpty
 
 import Data.Map (Map)
 import qualified Data.Map as Map 
@@ -30,26 +33,45 @@ validDotComMail = [regex|${plus chars}@${plus chars}.com|]
 plus :: RegExp -> RegExp
 plus r = rSeq r (rStar r)
 
-zeroOneAlph = Set.fromList['0','1']
-
 testBrzozowskiConstruction :: Test
-testBrzozowskiConstruction = 
+testBrzozowskiConstruction = "brzozowski construction" ~:
   TestList [
-    brzozowskiConstruction Empty ~?= emptyStringDfa zeroOneAlph,
-    brzozowskiConstruction [regex|(0|1)*|] ~?= sigmaStarDfa zeroOneAlph
+    brzozowskiConstruction Empty ~?= emptyStringDfa defaultAlpha,
+    brzozowskiConstruction [regex|(0|1)*|] ~?= sigmaStarDfa zeroOneAlpha,
+    brzozowskiConstruction (rStar (rChar "a"))
+      ~?= DFA {dstart = 0, 
+               dstates = Set.singleton 0,
+               daccept = Set.singleton 0,
+               dtransition = Map.fromList [((0,'a'),0)],
+               dalphabet = return 'a'}
   ]
 
 testThompsonConstruction :: Test
 testThompsonConstruction = 
   TestList [
-    thompsonConstruction Empty ~?= emptyStringDfa zeroOneAlph,
-    thompsonConstruction [regex|(0|1)*|] ~?= sigmaStarDfa zeroOneAlph
+    thompsonConstruction Empty ~?= emptyStringDfa defaultAlpha,
+    thompsonConstruction [regex|(0|1)*|] ~?= sigmaStarDfa zeroOneAlpha,
+    thompsonConstruction (rStar (rChar "a"))
+      ~?= DFA {dstart = 0, 
+               dstates = Set.singleton 0,
+               daccept = Set.singleton 0,
+               dtransition = Map.fromList [((0,'a'),0)],
+               dalphabet = return 'a'}
   ]
 
+--TODO: optimizations (character set, optimized NFA operations) 
+-- to make Thompson construction run in reasonable time
 testConstructionsIsomorphic :: Test
 testConstructionsIsomorphic = 
   TestList [
-    thompsonConstruction validDotComMail == brzozowskiConstruction validDotComMail ~?= True
+    thompsonConstruction (rAlt (rChar "a") (rChar "b")) 
+      ~?= brzozowskiConstruction (rAlt (rChar "a") (rChar "b")),
+    thompsonConstruction (rSeq (rChar "a") (rChar "b"))
+      ~?= brzozowskiConstruction (rSeq (rChar "a") (rChar "b")),
+    thompsonConstruction (rStar (rChar "a")) 
+      ~?= brzozowskiConstruction (rStar (rChar "a")),
+    thompsonConstruction validDotComMail 
+      ~?= brzozowskiConstruction validDotComMail
   ]
 
 newtype ZOString = ZOString {str :: String} deriving (Show)
@@ -60,13 +82,13 @@ instance Arbitrary ZOString where
       ZOString <$> sequence [ (choose ('0','1')) | _ <- [1..k]]
 
 instance Arbitrary RegExp where
-   arbitrary = oneof [rChar . Set.fromList <$> sublistOf "01",
+   arbitrary = oneof [rChar <$> sublistOf "01",
                       rAlt <$> arbitrary <*> arbitrary, 
                       rSeq <$> arbitrary <*> arbitrary,
                       rStar <$> arbitrary, 
                       return Empty,
                       return Void]
-   shrink (Char cs)   = [rChar (Set.singleton '0'), rChar (Set.singleton '1')]
+   shrink (Char cs)   = [rChar "0", rChar "1"]
    shrink (Alt r1 r2) = [r1, r2]
    shrink (Seq r1 r2) = [r1, r2]
    shrink (Star r)    = [r]
@@ -83,16 +105,6 @@ propAcceptSame regexp s = let thomDfa = thompsonConstruction regexp
                               brzDfa = brzozowskiConstruction regexp
                           in decideString brzDfa (str s) == decideString thomDfa (str s)
 
-propThompsonFinishes :: RegExp -> ZOString -> Bool
-propThompsonFinishes regexp s = let thomNfa = thompsonNfaConstruction regexp in
-                                trace (show thomNfa) True
-
-propDfaFinishes :: RegExp -> ZOString -> Bool
-propDfaFinishes regexp s = let thomNfa = thompsonNfaConstruction regexp in
-                           let thomDfa = dfaConstruction thomNfa in
-                           trace (show thomDfa) True
-
--- TODO: debug
 propNfaDfaAcceptSame :: RegExp -> ZOString -> Bool
 propNfaDfaAcceptSame regexp s = let thomNfa = thompsonNfaConstruction regexp in
                                 let thomDfa = dfaConstruction thomNfa in
