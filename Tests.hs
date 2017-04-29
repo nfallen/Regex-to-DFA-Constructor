@@ -11,6 +11,8 @@ import DFA
 import NFA
 import Construction
 
+import Data.List.NonEmpty as NonEmpty
+
 import Data.Map (Map)
 import qualified Data.Map as Map 
 
@@ -30,7 +32,7 @@ validDotComMail = [regex|${plus chars}@${plus chars}.com|]
 plus :: RegExp -> RegExp
 plus r = rSeq r (rStar r)
 
-zeroOneAlph = Set.fromList['0','1']
+zeroOneAlph = NonEmpty.fromList "01"
 
 testBrzozowskiConstruction :: Test
 testBrzozowskiConstruction = 
@@ -60,13 +62,13 @@ instance Arbitrary ZOString where
       ZOString <$> sequence [ (choose ('0','1')) | _ <- [1..k]]
 
 instance Arbitrary RegExp where
-   arbitrary = oneof [rChar . Set.fromList <$> sublistOf "01",
+   arbitrary = oneof [rChar <$> sublistOf "01",
                       rAlt <$> arbitrary <*> arbitrary, 
                       rSeq <$> arbitrary <*> arbitrary,
                       rStar <$> arbitrary, 
                       return Empty,
                       return Void]
-   shrink (Char cs)   = [rChar (Set.singleton '0'), rChar (Set.singleton '1')]
+   shrink (Char cs)   = [rChar "0", rChar "1"]
    shrink (Alt r1 r2) = [r1, r2]
    shrink (Seq r1 r2) = [r1, r2]
    shrink (Star r)    = [r]

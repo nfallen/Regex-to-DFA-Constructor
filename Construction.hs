@@ -39,54 +39,58 @@ thompsonNfaConstruction r = construction r (alpha r) where
   construction (Star r) ab = kleeneNfa (construction r ab)
 
 testThompsonNfaConstruction :: Test
-testThompsonNfaConstruction = TestList [
-  thompsonNfaConstruction (rChar "a") ~?= 
-    NFA {
-    nstart = 0,
-    nstates = Set.fromList [0,1],
-    naccept = Set.singleton 1,
-    ntransition = Map.fromList [((0,Just 'a'), Set.singleton 1)],
-    nalphabet = return 'a'
-  },
-  thompsonNfaConstruction (rStar (rSeq (rChar "a") (rChar "b"))) ~?= 
-    NFA {
+testThompsonNfaConstruction = "thompson construction of NFA from regex" ~: 
+  TestList [
+    thompsonNfaConstruction (rChar "a") ~?= 
+      NFA {
       nstart = 0,
-      nstates = Set.fromList [0,1,2,3,4,5],
-      naccept = Set.singleton 5,
-      ntransition = Map.fromList [((0,Nothing), Set.fromList [1,5]),
-                                  ((1,Nothing), Set.fromList [2,4]),
-                                  ((2, Just 'a'), (Set.singleton 3)),
-                                  ((4, Just 'b'), (Set.singleton 5)),
-                                  ((4, Nothing), (Set.fromList [5,1])),
-                                  ((3,Nothing), (Set.singleton 4))],
-      nalphabet = NonEmpty.fromList "ab"
+      nstates = Set.fromList [0,1],
+      naccept = Set.singleton 1,
+      ntransition = Map.fromList [((0,Just 'a'), Set.singleton 1)],
+      nalphabet = return 'a'
     },
-    thompsonNfaConstruction (rAlt (rStar (rSeq (rChar "a") (rChar "b"))) 
-                  (rStar (rSeq (rChar "a") (rChar "b")))) ~?= 
-    NFA {
-      nstart = 0,
-      nstates = Set.fromList [0,1,2,3,4,5],
-      naccept = Set.singleton 5,
-      ntransition = Map.fromList [((0,Nothing), Set.fromList [1,5]),
-                                  ((1,Nothing), Set.fromList [2,4]),
-                                  ((2, Just 'a'), (Set.singleton 3)),
-                                  ((4, Just 'b'), (Set.singleton 5)),
-                                  ((4, Nothing), (Set.fromList [5,1])),
-                                  ((3,Nothing), (Set.singleton 4))],
-      nalphabet = NonEmpty.fromList "ab"
-    },
-    thompsonNfaConstruction (rAlt (rChar "a") (rChar "b")) ~?=
-    NFA {
-      nstart = 0,
-      nstates = Set.fromList [0,1,2,3,4,5],
-      naccept = Set.singleton 5,
-      ntransition = Map.fromList [((0,Nothing), Set.fromList [1,3]),
-                                  ((1, Just 'a'), (Set.singleton 2)),
-                                  ((3, Just 'b'), (Set.singleton 4)),
-                                  ((2,Nothing), (Set.singleton 5)),
-                                  ((4,Nothing), (Set.singleton 5))],
-      nalphabet = NonEmpty.fromList "ab"
-    }] 
+    thompsonNfaConstruction (rStar (rSeq (rChar "a") (rChar "b"))) ~?= 
+      NFA {
+        nstart = 0,
+        nstates = Set.fromList [0,1,2,3,4,5],
+        naccept = Set.singleton 5,
+        ntransition = Map.fromList [((0, Nothing), Set.fromList [1,5]),
+                                    ((1, Just 'a'), Set.singleton 2),
+                                    ((2, Nothing), (Set.singleton 3)),
+                                    ((3, Just 'b'), (Set.singleton 4)),
+                                    ((4, Nothing), (Set.fromList [1,5]))],
+        nalphabet = NonEmpty.fromList "ab"
+      },
+      thompsonNfaConstruction (rAlt (rChar "a") (rChar "b")) ~?=
+        NFA {
+          nstart = 0,
+          nstates = Set.fromList [0,1,2,3,4,5],
+          naccept = Set.singleton 5,
+          ntransition = Map.fromList [((0,Nothing), Set.fromList [1,3]),
+                                      ((1, Just 'a'), (Set.singleton 2)),
+                                      ((3, Just 'b'), (Set.singleton 4)),
+                                      ((2,Nothing), (Set.singleton 5)),
+                                      ((4,Nothing), (Set.singleton 5))],
+          nalphabet = NonEmpty.fromList "ab"
+        },
+      thompsonNfaConstruction (rAlt (rStar (rSeq (rChar "a") (rChar "b"))) 
+                    (rStar (rChar "b"))) ~?= 
+        NFA {
+          nstart = 0, 
+          nstates = Set.fromList [0,1,2,3,4,5,6,7,8,9,10,11],
+          naccept = Set.fromList [11],
+          ntransition = Map.fromList [((0,Nothing), Set.fromList [1,7]),
+                                      ((1,Nothing), Set.fromList [2,6]),
+                                      ((2,Just 'a'), Set.fromList [3]),
+                                      ((3,Nothing), Set.fromList [4]),
+                                      ((4,Just 'b'), Set.fromList [5]),
+                                      ((5,Nothing), Set.fromList [2,6]),
+                                      ((6,Nothing), Set.fromList [11]),
+                                      ((7,Nothing), Set.fromList [8,10]),
+                                      ((8,Just 'b'), Set.fromList [9]),
+                                      ((9,Nothing), Set.fromList [8,10]),
+                                      ((10,Nothing), Set.fromList [11])], 
+          nalphabet = NonEmpty.fromList "ab"}]
 
 data DFASt a = DFASt { qStateCounter :: Int, 
                        qCorr  :: Map a QState,
@@ -156,36 +160,47 @@ dfaConstruction nfa =
   in withAccepts accepts (getDfa dst)
 
 testDfaConstruction :: Test 
-testDfaConstruction = TestList [
-  dfaConstruction (singleCharNfa 'a') ~?= 
-    DFA {dstart = 0, 
-         dstates = Set.fromList [0,1,2],
-         daccept = Set.fromList [1],
-         dtransition = Map.fromList [((0,'a'),1),((1,'a'),2),((2,'a'),2)],
-         dalphabet = return 'a'},
-  dfaConstruction (unionNfa (singleCharNfa 'a') (singleCharNfa 'b')) ~?= 
-    DFA {dstart = 0,
-         dstates = Set.fromList [0,1,2,3],
-         daccept = Set.fromList [1,3],
-         dtransition = Map.fromList [((0,'a'),1),
-                                     ((0,'b'),3),
-                                     ((1,'a'),2),
-                                     ((1,'b'),2),
-                                     ((2,'a'),2),
-                                     ((2,'b'),2),
-                                     ((3,'a'),2),
-                                     ((3,'b'),2)],
-         dalphabet = NonEmpty.fromList "ab"}]
+testDfaConstruction = "DFA correctly constructed from NFA" ~:
+  TestList [
+    dfaConstruction (singleCharNfa 'a') ~?= 
+      DFA {dstart = 0, 
+           dstates = Set.fromList [0,1,2],
+           daccept = Set.fromList [1],
+           dtransition = Map.fromList [((0,'a'),1),((1,'a'),2),((2,'a'),2)],
+           dalphabet = return 'a'},
+    dfaConstruction (unionNfa (singleCharNfa 'a') (singleCharNfa 'b')) ~?= 
+      DFA {dstart = 0,
+           dstates = Set.fromList [0,1,2,3],
+           daccept = Set.fromList [1,3],
+           dtransition = Map.fromList [((0,'a'),1),
+                                       ((0,'b'),3),
+                                       ((1,'a'),2),
+                                       ((1,'b'),2),
+                                       ((2,'a'),2),
+                                       ((2,'b'),2),
+                                       ((3,'a'),2),
+                                       ((3,'b'),2)],
+           dalphabet = NonEmpty.fromList "ab"}]
 
 dfaMinimization :: DFA -> DFA
 dfaMinimization d = mergePair (deleteUnreachable d (Set.toList (dstates d))) 
                               $ allPairs $ Set.toList $ dstates d
 
 excessDFA = DFA {dstart = 0, 
-                 dstates = Set.fromList [0,1,2,4,5],
+                 dstates = Set.fromList [0,1,2,3,4,5],
                  daccept = Set.fromList [2,3,4],
-                 dtransition = Map.fromList [((0,'0'),1),((0,'1'),2),((1,'0'),0),((1,'1'),3),((2,'0'),4),
-                                             ((2,'1'),5),((3,'0'),4),((3,'1'),5),((4,'0'),4),((4,'1'),5),((5,'0'),5),((5,'1'),5)],
+                 dtransition = Map.fromList [((0,'0'),1),
+                                             ((0,'1'),2),
+                                             ((1,'0'),0),
+                                             ((1,'1'),3),
+                                             ((2,'0'),4),
+                                             ((2,'1'),5),
+                                             ((3,'0'),4),
+                                             ((3,'1'),5),
+                                             ((4,'0'),4),
+                                             ((4,'1'),5),
+                                             ((5,'0'),5),
+                                             ((5,'1'),5)],
                  dalphabet = NonEmpty.fromList "01"}  
 
 unreachableDFA = DFA {dstart = 0,
@@ -197,9 +212,20 @@ unreachableDFA = DFA {dstart = 0,
 unreachableDFA2 =  DFA {dstart = 0, 
                         dstates = Set.fromList [0,1,2,4,5,6],
                         daccept = Set.fromList [2,3,4],
-                        dtransition = Map.fromList [((0,'0'),1),((0,'1'),2),((1,'0'),0),((1,'1'),3),((2,'0'),4),
-                                             ((2,'1'),5),((3,'0'),4),((3,'1'),5),((4,'0'),4),((4,'1'),5),((5,'0'),5),((5,'1'),5),
-                                             ((6,'1'),5),((6,'0'),6)],
+                        dtransition = Map.fromList [((0,'0'),1),
+                                                    ((0,'1'),2),
+                                                    ((1,'0'),0),
+                                                    ((1,'1'),3),
+                                                    ((2,'0'),4),
+                                                    ((2,'1'),5),
+                                                    ((3,'0'),4),
+                                                    ((3,'1'),5),
+                                                    ((4,'0'),4),
+                                                    ((4,'1'),5),
+                                                    ((5,'0'),5),
+                                                    ((5,'1'),5),
+                                                    ((6,'1'),5),
+                                                    ((6,'0'),6)],
                         dalphabet = NonEmpty.fromList "01"}                            
 
 -- TODO: more tests
@@ -210,25 +236,48 @@ testDfaMinimization = "Resulting DFA is minimized" ~:
     DFA {dstart = 0, 
          dstates = Set.fromList [0,2,5],
          daccept = Set.fromList [2],
-         dtransition = Map.fromList [((0,'0'),0),((0,'1'),2),((2,'0'),2),((2,'1'),5),((5,'0'),5),((5,'1'),5)],
-         dalphabet = NonEmpty.fromList "01"}
+         dtransition = Map.fromList [((0,'0'),0),
+                                     ((0,'1'),2),
+                                     ((2,'0'),2),
+                                     ((2,'1'),5),
+                                     ((5,'0'),5),
+                                     ((5,'1'),5)],
+         dalphabet = NonEmpty.fromList "01"},
+
+    dfaMinimization (DFA {dstart = 0, 
+         dstates = Set.fromList [0,1,2,3],
+         daccept = Set.fromList [1],
+         dtransition = Map.fromList [((0,'a'),1),
+                                     ((1,'a'),2),
+                                     ((2,'a'),3),
+                                     ((3,'a'),2)],
+         dalphabet = return 'a'}) ~?=
+    dfaMinimization (dfaConstruction (singleCharNfa 'a')),
+
+    dfaMinimization (DFA {dstart = 0,
+                      dstates = Set.fromList [0,1],
+                      daccept = Set.empty,
+                      dtransition = Map.fromList [((1,'a'),0)],
+                      dalphabet = NonEmpty.fromList "ab"}) ~?=
+    emptySetDfa (NonEmpty.fromList "ab")
   ]
 
 deleteUnreachable :: DFA -> [QState] -> DFA
 deleteUnreachable d [] = d
-deleteUnreachable d @states(x:xs) = if ((not $ inwardTransition x $ dtransition d) && not (x == dstart d)) 
-                                    then deleteUnreachable (DFA {dstart = dstart d,
-                                                                 dstates = Set.delete x (dstates d),
-                                                                 daccept = daccept d,  
-                                                                 dtransition = Map.fromList $ deleteKey x $ Map.toList $ dtransition d, 
-                                                                 dalphabet = dalphabet d }) xs 
-                                    else deleteUnreachable d xs 
+deleteUnreachable d @states(x:xs) = 
+  if ((not $ inwardTransition x $ dtransition d) && not (x == dstart d)) 
+    then deleteUnreachable (DFA {dstart = dstart d,
+                                 dstates = Set.delete x (dstates d),
+                                 daccept = daccept d,  
+                                 dtransition = Map.fromList $ deleteKey x $ Map.toList $ dtransition d, 
+                                 dalphabet = dalphabet d }) xs 
+    else deleteUnreachable d xs 
 
 testDeleteUnreachable :: Test
 testDeleteUnreachable = "Unreachable states deleted from resulting DFA" ~:
   TestList[
-    deleteUnreachable (unreachableDFA) (Set.toList $ dstates unreachableDFA) ~?= emptySetDfa (Set.fromList ['a','b']),
-    deleteUnreachable (unreachableDFA2) (Set.toList $ dstates unreachableDFA2) ~?= excessDFA --TODO: why is this failing?! 
+    deleteUnreachable (unreachableDFA) (Set.toList $ dstates unreachableDFA) ~?= emptySetDfa (NonEmpty.fromList "ab"),
+    deleteUnreachable (unreachableDFA2) (Set.toList $ dstates unreachableDFA2) ~?= excessDFA 
   ]
 
 
@@ -241,18 +290,6 @@ testDeleteKey = "Deletes matching keys" ~:
     deleteKey 3 [((3,'a'),2)] ~?= [],
     deleteKey 3 [((3,'a'),2),((3,'b'),1),((2,'a'),3)] ~?= [((2,'a'),3)],
     deleteKey 3 [((2,'a'),4),((3,'a'),2)] ~?= [((2,'a'),4)]
-  ]
-
-replaceInwardTransitions :: QState -> QState-> [((QState, Char), QState)] -> [((QState, Char), QState)] 
-replaceInwardTransitions k1 k2 translist = List.map (\((a,b),c) -> ((a,b),k2)) 
-                                           $ List.filter (\((a,b),c) -> (c == k1)) translist   
-
-testReplaceInwardTransitions :: Test
-testReplaceInwardTransitions = "Replaces inward transitions" ~:
-  TestList[
-    replaceInwardTransitions 0 1 [((3,'a'),0),((4,'b'),1),((2,'a'),1)] ~?= [((3,'a'),1)],
-    replaceInwardTransitions 0 1 [((3,'a'),1)] ~?= [],
-    replaceInwardTransitions 0 1 [((3,'a'),1),((4,'b'),0),((2,'a'),1)] ~?= [((4,'b'),1)]
   ]
 
 inwardTransition :: QState -> Dtransition -> Bool 
@@ -288,41 +325,65 @@ mergePair d [] = d
 mergePair d (x:xs) =  let newd = mergeIndistinct d (fst x) (snd x) in
                           if (newd == d) 
                           then mergePair d xs -- try next pair in dfa d
-                          else mergePair newd xs 
+                          else mergePair newd $ allPairs $ Set.toList $ dstates newd
+
+addOutward :: QState -> QState-> [((QState, Char), QState)] -> [((QState, Char), QState)] 
+addOutward s1 s2 translist = translist ++ (List.map (\((a,b),c) -> ((a,b),s1)) $
+                            List.filter (\((a,b),c) -> (c == s2)) translist) 
 
 mergeIndistinct :: DFA -> QState -> QState -> DFA
 mergeIndistinct d x1 x2 = if indistinct d x1 x2 
                           then  DFA {dstart = dstart d,
                                      dstates = Set.delete x2 (dstates d),
-                                     daccept = daccept d,  
-                                     dtransition = Map.union (Map.fromList (deleteKey x2 (Map.toList (dtransition d))))
-                                                   $ Map.fromList $ replaceInwardTransitions x2 x1 $ Map.toList $ dtransition d, 
+                                     daccept = Set.delete x2 $ daccept d,  
+                                     dtransition = Map.fromList (addOutward x1 x2 $ 
+                                                   deleteKey x2 (Map.toList (dtransition d))), 
                                      dalphabet = dalphabet d}
                           else d 
 
+testMergeIndistinct :: Test
+testMergeIndistinct = "Merges indistinct states" ~:
+  TestList[
+    mergeIndistinct excessDFA 2 3 ~?= DFA {dstart = 0, 
+                 dstates = Set.fromList [0,1,2,4,5],
+                 daccept = Set.fromList [2,4],
+                 dtransition = Map.fromList [((0,'0'),1),
+                                             ((0,'1'),2),
+                                             ((1,'0'),0),
+                                             ((1,'1'),2),
+                                             ((2,'0'),4),
+                                             ((2,'1'),5),
+                                             ((4,'0'),4),
+                                             ((4,'1'),5),
+                                             ((5,'0'),5),
+                                             ((5,'1'),5)],
+                 dalphabet = NonEmpty.fromList "01"}  
+  ]
+
 indistinct :: DFA -> QState -> QState -> Bool
-indistinct d1 s1 s2 = if (((Set.member s1 $ daccept d1) && not (Set.member s2 $ daccept d1)) ||
-                               ((Set.member s2 $ daccept d1) && not (Set.member s1 $ daccept d1)))
-                      then False
-                      else transitionsDistinct d1 s1 s2 where
-                           transitionsDistinct :: DFA -> QState -> QState -> Bool 
-                           transitionsDistinct d1 s1 s2 = iterateAlphabet alist d1 s1 s2 
-                                                                 where alist = Set.toList $ dalphabet d1 
+indistinct d1 s1 s2 = 
+  if (((Set.member s1 $ daccept d1) && not (Set.member s2 $ daccept d1)) ||
+           ((Set.member s2 $ daccept d1) && not (Set.member s1 $ daccept d1)))
+  then False
+  else transitionsDistinct d1 s1 s2 where
+       transitionsDistinct :: DFA -> QState -> QState -> Bool 
+       transitionsDistinct d1 s1 s2 = iterateAlphabet (dalphabet d1) d1 s1 s2 
 
 testIndistinct :: Test
 testIndistinct = "Determines if states are indistinct" ~:
   TestList[
     indistinct excessDFA 2 3 ~?= True,
     indistinct excessDFA 1 2 ~?= False,
-    indistinct excessDFA 3 5 ~?= False]
+    indistinct excessDFA 3 5 ~?= False
+  ]
 
-iterateAlphabet :: [Char] -> DFA -> QState -> QState -> Bool
-iterateAlphabet [] d1 s1 d2 = True 
-iterateAlphabet (x:xs) d1 s1 s2 = case (Map.lookup (s1,x) (dtransition d1)) of 
-                                        Just a -> case (Map.lookup (s2,x) (dtransition d1)) of 
-                                                          Just b -> a == b && iterateAlphabet xs d1 s1 s2 
-                                                          _ -> False 
-                                        _ -> False 
+iterateAlphabet :: Alpha -> DFA -> QState -> QState -> Bool
+iterateAlphabet ab dfa s1 s2 = foldr matches True ab where 
+  matches x acc = 
+    let transitions = dtransition dfa in
+    case (Map.lookup (s1,x) transitions, Map.lookup (s2,x) transitions) of
+      (Just a, Just b) -> acc && (a == b || a == s2 || b == s1)
+      _ -> False 
 
 
 -- return True when r matches the empty string
@@ -362,6 +423,6 @@ brzozowskiConstruction = undefined
 main :: IO ()
 main = do
     runTestTT $ TestList [testDfaConstruction, testThompsonNfaConstruction,testDfaMinimization,
-                          testDeleteUnreachable, testInwardTransition, testDeleteKey, testReplaceInwardTransitions,
-                          testAllPairs, testIndistinct]
+                          testDeleteUnreachable, testInwardTransition, testDeleteKey,
+                          testAllPairs, testIndistinct, testMergeIndistinct]
     return ()
