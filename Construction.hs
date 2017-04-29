@@ -241,6 +241,11 @@ testDfaMinimization = "Resulting DFA is minimized" ~:
 
   ]
 
+updateStateSet :: DFA -> DFA
+updateStateSet d = let states = Set.toAscList $ dstates d in
+                      updateState :: [QState] -> [QState]
+                      updateState states = List.map (\x -> states !! x) states  
+
 deleteUnreachable :: DFA -> [QState] -> DFA
 deleteUnreachable d [] = d
 deleteUnreachable d @states(x:xs) = if ((not $ inwardTransition x $ dtransition d) && not (x == dstart d)) 
