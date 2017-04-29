@@ -160,7 +160,7 @@ testEqDFA = "test isomorphic DFA" ~:
       d1 = sigmaStarDfa ab
       d2 = emptySetDfa ab
       excessDFA = DFA {dstart = 0, 
-             dstates = Set.fromList [0,1,2,4,5], 
+             dstates = Set.fromList [0,1,2,3,4,5], 
              daccept = Set.fromList [2,3,4], 
              dtransition = Map.fromList [((0,'0'),1),((0,'1'),2),((1,'0'),0),
              ((1,'1'),3),((2,'0'),4),((2,'1'),5),((3,'0'),4),

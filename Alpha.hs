@@ -1,7 +1,7 @@
-{-# OPTIONS -fwarn-incomplete-patterns -fwarn-tabs #-}
+{-# OPTIONS -fwarn-tabs #-}
 {-# LANGUAGE NoImplicitPrelude, PatternSynonyms, FlexibleInstances, ScopedTypeVariables, TemplateHaskell, QuasiQuotes #-}
 
-module Alpha (Alpha, alpha, unionAlpha) where
+module Alpha (Alpha, alpha, unionAlpha, defaultAlpha, zeroOneAlpha) where
 
 import Prelude
 
@@ -19,6 +19,9 @@ type Alpha = NonEmpty Char
 
 defaultAlpha :: Alpha
 defaultAlpha = return '0'
+
+zeroOneAlpha :: Alpha
+zeroOneAlpha = fromList "01"
 
 createAlpha :: RegExp -> [Char]
 createAlpha Empty       = []
@@ -43,3 +46,4 @@ testAlpha = TestList [
           (rChar "a") 
           (rChar "b")) 
   ~?= fromList "ab"]
+  

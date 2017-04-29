@@ -1,3 +1,4 @@
+
 module Construction where
 
 import Regex
@@ -27,7 +28,7 @@ import Test.HUnit (Test(..), (~:), (~?=), runTestTT, assertBool)
 
 thompsonConstruction :: RegExp -> DFA
 thompsonConstruction regexp = let nfa = thompsonNfaConstruction regexp
-                              in dfaConstruction nfa
+                              in dfaMinimization $ dfaConstruction nfa
 
 thompsonNfaConstruction :: RegExp -> NFA
 thompsonNfaConstruction r = construction r (alpha r) where
@@ -405,21 +406,35 @@ deriv (Seq r1 r2) c          = deriv r1 c `rSeq` r2
 deriv (Star r) c             = deriv r c `rSeq` rStar r
 deriv Void _ = Void
 
-brzozowskiStateConstruction :: [Char] -> Maybe RegExp -> State (DFASt (RegExp)) ()
-brzozowskiStateConstruction alpha Nothing  = return ()
-brzozowskiStateConstruction alpha (Just r) = do     
+brzozowskiStateConstruction :: Alpha -> Maybe RegExp -> State (DFASt (RegExp)) ()
+brzozowskiStateConstruction ab Nothing  = return ()
+brzozowskiStateConstruction ab (Just r) = do     
   dst <- get
-  let qCharPairs = (\c -> (r,c)) <$> alpha
+  let qCharPairs = (\c -> (r,c)) <$> ab
   derivs <- sequence $ addTransition deriv <$> qCharPairs
-  sequence_ $ brzozowskiStateConstruction alpha <$> derivs
+  sequence_ $ brzozowskiStateConstruction ab <$> derivs
   return ()
 
 brzozowskiConstruction :: RegExp -> DFA
-brzozowskiConstruction = undefined
+brzozowskiConstruction r = 
+  let ab = alpha r
+      initDfa = DFA {
+        dstart = 0, 
+        dstates = Set.empty, 
+        daccept = Set.empty,
+        dtransition = Map.empty, 
+        dalphabet = ab }
+      initDfaSt = DFASt {
+                    qStateCounter = 0,
+                    qCorr = Map.empty,
+                    getDfa = initDfa}
+      dst = execState (brzozowskiStateConstruction ab (Just r)) initDfaSt
+      accepts = getAcceptStates nullable (qCorr dst)
+  in withAccepts accepts (getDfa dst)
 
 main :: IO ()
 main = do
-    runTestTT $ TestList [testDfaConstruction, testThompsonNfaConstruction,testDfaMinimization,
+    runTestTT $ TestList [testDfaConstruction, testThompsonNfaConstruction, testDfaMinimization,
                           testDeleteUnreachable, testInwardTransition, testDeleteKey,
-                          testAllPairs, testIndistinct, testMergeIndistinct]
+                          testAllPairs, testIndistinct, testMergeIndistinct ]
     return ()

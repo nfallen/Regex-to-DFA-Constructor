@@ -48,16 +48,19 @@ data RegExp = CharExp (NonEmpty Char)      -- single literal character
 rAlt :: RegExp -> RegExp -> RegExp
 rAlt Void x = x
 rAlt x Void = x
-rAlt r1 r2 
+rAlt (StarExp r) Empty = StarExp r
+rAlt Empty (StarExp r) = StarExp r
+rAlt r1 r2 -- keep ordering consistent so that regexes will pass equality checks
   | r1 == r2  = r1
-  | otherwise = AltExp r1 r2
+  | r1 < r2   = AltExp r1 r2
+  | otherwise = AltExp r2 r1
 
 rSeq :: RegExp -> RegExp -> RegExp
 rSeq Void _ = Void -- concatenating any string to void is void 
 rSeq _ Void = Void
 rSeq Empty x = x -- concatenating the empty string to any string is itself
 rSeq x Empty = x
-rSeq r1 r2 = SeqExp r1 r2 -- no optimization
+rSeq r1 r2 = SeqExp r1 r2
 
 rStar :: RegExp -> RegExp
 rStar (Star x) = StarExp x -- two iterations is the same as one
