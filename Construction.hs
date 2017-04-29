@@ -210,7 +210,7 @@ unreachableDFA = DFA {dstart = 0,
                       dalphabet = NonEmpty.fromList "ab"} 
 
 unreachableDFA2 =  DFA {dstart = 0, 
-                        dstates = Set.fromList [0,1,2,4,5,6],
+                        dstates = Set.fromList [0,1,2,3,4,5,6],
                         daccept = Set.fromList [2,3,4],
                         dtransition = Map.fromList [((0,'0'),1),
                                                     ((0,'1'),2),
@@ -362,12 +362,18 @@ testMergeIndistinct = "Merges indistinct states" ~:
 
 indistinct :: DFA -> QState -> QState -> Bool
 indistinct d1 s1 s2 = 
-  if (((Set.member s1 $ daccept d1) && not (Set.member s2 $ daccept d1)) ||
-           ((Set.member s2 $ daccept d1) && not (Set.member s1 $ daccept d1)))
-  then False
-  else transitionsDistinct d1 s1 s2 where
-       transitionsDistinct :: DFA -> QState -> QState -> Bool 
-       transitionsDistinct d1 s1 s2 = iterateAlphabet (dalphabet d1) d1 s1 s2 
+  let accepts = daccept d1 in
+  Set.member s1 accepts == Set.member s2 accepts
+    && transitionsIndistinct d1 s1 s2 
+  where
+    transitionsIndistinct :: DFA -> QState -> QState -> Bool 
+    transitionsIndistinct dfa s1 s2 = foldr matches True ab where 
+      ab = dalphabet d1
+      matches x acc = 
+        let transitions = dtransition dfa in
+        case (Map.lookup (s1,x) transitions, Map.lookup (s2,x) transitions) of
+          (Just a, Just b) -> acc && (a == b || a == s2 || b == s1)
+          _ -> False 
 
 testIndistinct :: Test
 testIndistinct = "Determines if states are indistinct" ~:
@@ -376,15 +382,6 @@ testIndistinct = "Determines if states are indistinct" ~:
     indistinct excessDFA 1 2 ~?= False,
     indistinct excessDFA 3 5 ~?= False
   ]
-
-iterateAlphabet :: Alpha -> DFA -> QState -> QState -> Bool
-iterateAlphabet ab dfa s1 s2 = foldr matches True ab where 
-  matches x acc = 
-    let transitions = dtransition dfa in
-    case (Map.lookup (s1,x) transitions, Map.lookup (s2,x) transitions) of
-      (Just a, Just b) -> acc && (a == b || a == s2 || b == s1)
-      _ -> False 
-
 
 -- return True when r matches the empty string
 nullable :: RegExp -> Bool
