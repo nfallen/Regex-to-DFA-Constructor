@@ -272,20 +272,26 @@ updateStateSet :: DFA -> DFA
 updateStateSet d = let states = Set.toAscList $ dstates d
                        statemap = updateState states where
                                   updateState :: [QState] -> Map Int QState
-                                  updateState states = foldr (\x -> Map.insert x (getIndex states x)) Map.empty states 
+                                  updateState states = foldr (\x -> Map.insert x (getIndex states x)) 
+                                                        Map.empty states 
                    in  
                    DFA {dstart = case Map.lookup (dstart d) statemap of 
-                                      Nothing -> 0
+                                      Nothing -> error "Dstart unmapped"
                                       Just a -> a,
-                                 dstates = Set.fromList $ fmap (\(k,v) -> v) (Map.toList statemap),
-                                 daccept = Set.fromList $ fmap (\x -> (case (Map.lookup x statemap) of 
-                                                                            Nothing -> x
-                                                                            Just a -> a)) $ Set.toList $ daccept d,  
-                                 dtransition = Map.fromList $ fmap (\((a,b),c) -> (case (Map.lookup a statemap) of
-                                                                                    Nothing -> ((a,b),c)
-                                                                                    Just v1 -> case (Map.lookup c statemap) of 
-                                                                                                    Nothing -> ((a,b),c)
-                                                                                                    Just v2 ->  ((v1,b),v2))) $ Map.toList $ dtransition d, 
+                                 dstates = Set.fromList $ fmap (\(k,v) -> v)
+                                          (Map.toList statemap),
+                                 daccept = Set.fromList $ fmap 
+                                  (\x -> (case (Map.lookup x statemap) of 
+                                          Nothing -> error "Accept state unmapped"
+                                          Just a -> a)) $ Set.toList $ daccept d,  
+                                 dtransition = Map.fromList $ 
+                                fmap (\((a,b),c) -> 
+                                     (case (Map.lookup a statemap, 
+                                            Map.lookup c statemap) of
+                                            (Nothing,_) -> error "Transition unmapped"
+                                            (_,Nothing) -> error "Transition unmapped"
+                                            (Just v1, Just v2) -> ((v1,b),v2))) 
+                                $ Map.toList $ dtransition d, 
                                  dalphabet = dalphabet d }
                    
 
