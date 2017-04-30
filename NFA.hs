@@ -43,11 +43,11 @@ emptySetNfa ab = NFA {nstart = 0,
                    nalphabet = ab}
 
 emptyStringNfa :: Alpha -> NFA
-emptyStringNfa ab = NFA {nstart = 0,
+emptyStringNfa ab = NFA {nstart = 1,
                       nstates = Set.fromList [0,1],
-                      naccept = Set.singleton 0,
+                      naccept = Set.singleton 1,
                       ntransition = Map.fromList 
-                        [((0,Just s),Set.singleton 1) | s <- NonEmpty.toList ab],
+                        [((1,Just s),Set.singleton 0) | s <- NonEmpty.toList ab],
                       nalphabet = ab}
 
 -- takes in a set of states, returns the ones that are unseen 
@@ -108,7 +108,7 @@ testSymbolReachable = TestList [
     ~?= Set.fromList [2]]
 
 acceptsSomeState :: NFA -> Set QState -> Bool
-acceptsSomeState nfa qs = any accept (Set.toList qs) where
+acceptsSomeState nfa qs = any accept (Set.toList (epsilonReachable nfa qs)) where
                           accept q = Set.member q $ naccept nfa
   
 instance Automata NFA where
@@ -118,7 +118,7 @@ instance Automata NFA where
     where
       decideStringFromQState :: NFA -> String -> Set QState -> Maybe Bool
       decideStringFromQState nfa [] qs  = 
-        Just $ acceptsSomeState nfa (epsilonReachable nfa qs)
+        Just $ acceptsSomeState nfa qs
       decideStringFromQState nfa (c:cs) qs = 
         -- get all states reachable by epsilon transitions from current set of states
         let eqs' = epsilonReachable nfa qs
@@ -184,11 +184,48 @@ testSingleCharNfa = TestList [
     nalphabet = return 'a'
   }]
 
+acceptsEmptyNfa :: NFA -> NFA
+acceptsEmptyNfa nfa = 
+  if (acceptsSomeState nfa (Set.singleton $ nstart nfa))
+    then nfa
+    else let ab = nalphabet nfa
+             lastQStateN = Set.size (nstates nfa)
+             states = Set.insert 0 (fmap (+1) (nstates nfa))
+             incNT = fmap (fmap (+1)) $ 
+                     Map.mapKeys (\(a,b) -> (a + 1,b)) 
+                    (ntransition nfa)
+             transitions = Map.insert 
+                           (0, Nothing) 
+                           (Set.fromList [1, lastQStateN]) 
+                           incNT
+             accepts = Set.singleton lastQStateN
+             in NFA {nstart = 0, 
+                     nstates = states,
+                     naccept = accepts,
+                     ntransition = transitions, 
+                     nalphabet = ab}
+
+testAcceptsEmptyNfa :: Test
+testAcceptsEmptyNfa = TestList [
+  acceptsEmptyNfa (singleCharNfa 'a') ~?= 
+    NFA {
+      nstart = 0,
+      nstates = Set.fromList [0,1,2],
+      naccept = Set.singleton 2,
+      ntransition = Map.fromList [((0,Nothing), Set.fromList [1,2]),
+                                  ((1, Just 'a'), (Set.singleton 2))],
+      nalphabet = NonEmpty.fromList "a"
+    },
+  acceptsEmptyNfa (emptyStringNfa $ return 'a') 
+    ~?= emptyStringNfa (return 'a')
+
+  ]
+
 unionNfa :: NFA -> NFA -> NFA
 unionNfa n1 n2 
   | n1 == n2 = n1 
-  | n1 == emptySetNfa (nalphabet n1) = n2 
-  | n2 == emptySetNfa (nalphabet n2) = n1 
+  | n1 == emptySetNfa (nalphabet n1) = n2
+  | n2 == emptySetNfa (nalphabet n2) = n1
   | otherwise = let ab = nalphabet n1 `unionAlpha` nalphabet n2
                     lastQStateN1 = Set.size (nstates n1)
                     firstQStateN2 = lastQStateN1 + 1
@@ -323,6 +360,7 @@ testKleeneNfa = TestList [
 main :: IO ()
 main = do
     runTestTT $ TestList [testSingleCharNfa,
+                          testAcceptsEmptyNfa,
                           testUnionNfa,
                           testConcatNfa,
                           testKleeneNfa,

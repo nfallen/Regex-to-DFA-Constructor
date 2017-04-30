@@ -52,6 +52,51 @@ emptyStringDfa ab = DFA {dstart = 0,
                          dtransition = Map.fromList [((0,s),1) | s <- NonEmpty.toList ab],
                          dalphabet = ab}
 
+-- DFAs for testing purposes
+excessDFA = DFA {dstart = 0, 
+                    dstates = Set.fromList [0,1,2,3,4,5], 
+                    daccept = Set.fromList [2,3,4], 
+                    dtransition = Map.fromList [((0,'0'),1),
+                                                ((0,'1'),2),
+                                                ((1,'0'),0),
+                                                ((1,'1'),3),
+                                                ((2,'0'),4),
+                                                ((2,'1'),5),
+                                                ((3,'0'),4),
+                                                ((3,'1'),5),
+                                                ((4,'0'),4),
+                                                ((4,'1'),5),
+                                                ((5,'0'),5),
+                                                ((5,'1'),5)], 
+                    dalphabet = NonEmpty.fromList "01"}
+
+
+
+unreachableDFA = DFA {dstart = 0,
+                      dstates = Set.fromList [0,1],
+                      daccept = Set.empty,
+                      dtransition = Map.fromList[((1,'a'),0),((1,'b'),0)],
+                      dalphabet = NonEmpty.fromList "ab"} 
+
+unreachableDFA2 =  DFA {dstart = 0, 
+                        dstates = Set.fromList [0,1,2,3,4,5,6],
+                        daccept = Set.fromList [2,3,4],
+                        dtransition = Map.fromList [((0,'0'),1),
+                                                    ((0,'1'),2),
+                                                    ((1,'0'),0),
+                                                    ((1,'1'),3),
+                                                    ((2,'0'),4),
+                                                    ((2,'1'),5),
+                                                    ((3,'0'),4),
+                                                    ((3,'1'),5),
+                                                    ((4,'0'),4),
+                                                    ((4,'1'),5),
+                                                    ((5,'0'),5),
+                                                    ((5,'1'),5),
+                                                    ((6,'1'),5),
+                                                    ((6,'0'),6)],
+                        dalphabet = NonEmpty.fromList "01"}      
+
 withQState :: QState -> DFA -> DFA
 withQState q dfa = dfa { dstates = Set.insert q (dstates dfa) }
 
@@ -159,19 +204,26 @@ testEqDFA = "test isomorphic DFA" ~:
   let ab = NonEmpty.fromList "01"
       d1 = sigmaStarDfa ab
       d2 = emptySetDfa ab
-      excessDFA = DFA {dstart = 0, 
-             dstates = Set.fromList [0,1,2,3,4,5], 
-             daccept = Set.fromList [2,3,4], 
-             dtransition = Map.fromList [((0,'0'),1),((0,'1'),2),((1,'0'),0),
-             ((1,'1'),3),((2,'0'),4),((2,'1'),5),((3,'0'),4),
-             ((3,'1'),5),((4,'0'),4),((4,'1'),5),((5,'0'),5),((5,'1'),5)], 
-             dalphabet = NonEmpty.fromList "01"}
       in TestList[
         d1 == d1 ~?= True,
         d2 == d2 ~?= True,
         d1 == d2 ~?= False,
         d2 == d1 ~?= False,
-        excessDFA == excessDFA ~?= True
+        excessDFA == excessDFA ~?= True,
+        DFA {dstart = 0, 
+             dstates = Set.fromList [0,1], 
+             daccept = Set.fromList [1], 
+             dtransition = Map.fromList [((0,'1'),1),
+                                         ((1,'1'),1)], 
+             dalphabet = return '1'}
+        == DFA {dstart = 0, 
+             dstates = Set.fromList [0,1], 
+             daccept = Set.fromList [0,1], 
+             dtransition = Map.fromList [((0,'1'),1),
+                                     ((1,'1'),1)], 
+             dalphabet = return '1'}
+          ~?= False
+
       ]
 
 main :: IO ()

@@ -35,6 +35,8 @@ thompsonNfaConstruction r = construction r (alpha r) where
   construction Empty ab = emptyStringNfa ab
   construction Void  ab = emptySetNfa ab
   construction (Char cs) ab = foldr1 (\n1 n2 -> unionNfa n1 n2) (singleCharNfa <$> cs)
+  construction (Alt Empty r2) ab = acceptsEmptyNfa (construction r2 ab)
+  construction (Alt r1 Empty) ab = acceptsEmptyNfa (construction r1 ab)
   construction (Alt r1 r2) ab = unionNfa (construction r1 ab) (construction r2 ab) 
   construction (Seq r1 r2) ab = concatNfa (construction r1 ab) (construction r2 ab) 
   construction (Star r) ab = kleeneNfa (construction r ab)
@@ -80,18 +82,18 @@ testThompsonNfaConstruction = "thompson construction of NFA from regex" ~:
           nstart = 0, 
           nstates = Set.fromList [0,1,2,3,4,5,6,7,8,9,10,11],
           naccept = Set.fromList [11],
-          ntransition = Map.fromList [((0,Nothing), Set.fromList [1,7]),
-                                      ((1,Nothing), Set.fromList [2,6]),
-                                      ((2,Just 'a'), Set.fromList [3]),
-                                      ((3,Nothing), Set.fromList [4]),
-                                      ((4,Just 'b'), Set.fromList [5]),
-                                      ((5,Nothing), Set.fromList [2,6]),
-                                      ((6,Nothing), Set.fromList [11]),
-                                      ((7,Nothing), Set.fromList [8,10]),
-                                      ((8,Just 'b'), Set.fromList [9]),
-                                      ((9,Nothing), Set.fromList [8,10]),
-                                      ((10,Nothing), Set.fromList [11])], 
-          nalphabet = NonEmpty.fromList "ab"}]
+          ntransition = Map.fromList [((0,Nothing),Set.fromList [1,5]),
+                                      ((1,Nothing),Set.fromList [2,4]),
+                                      ((2,Just 'b'),Set.fromList [3]),
+                                      ((3,Nothing),Set.fromList [2,4]),
+                                      ((4,Nothing),Set.fromList [11]),
+                                      ((5,Nothing),Set.fromList [6,10]),
+                                      ((6,Just 'a'),Set.fromList [7]),
+                                      ((7,Nothing),Set.fromList [8]),
+                                      ((8,Just 'b'),Set.fromList [9]),
+                                      ((9,Nothing),Set.fromList [6,10]),
+                                      ((10,Nothing),Set.fromList [11])], 
+          nalphabet = NonEmpty.fromList "ba"}]
 
 data DFASt a = DFASt { qStateCounter :: Int, 
                        qCorr  :: Map a QState,
@@ -185,49 +187,7 @@ testDfaConstruction = "DFA correctly constructed from NFA" ~:
 
 dfaMinimization :: DFA -> DFA
 dfaMinimization d = mergePair (deleteUnreachable d (Set.toList (dstates d))) 
-                              $ allPairs $ Set.toList $ dstates d
-
-excessDFA = DFA {dstart = 0, 
-                 dstates = Set.fromList [0,1,2,3,4,5],
-                 daccept = Set.fromList [2,3,4],
-                 dtransition = Map.fromList [((0,'0'),1),
-                                             ((0,'1'),2),
-                                             ((1,'0'),0),
-                                             ((1,'1'),3),
-                                             ((2,'0'),4),
-                                             ((2,'1'),5),
-                                             ((3,'0'),4),
-                                             ((3,'1'),5),
-                                             ((4,'0'),4),
-                                             ((4,'1'),5),
-                                             ((5,'0'),5),
-                                             ((5,'1'),5)],
-                 dalphabet = NonEmpty.fromList "01"}  
-
-unreachableDFA = DFA {dstart = 0,
-                      dstates = Set.fromList [0,1],
-                      daccept = Set.empty,
-                      dtransition = Map.fromList[((1,'a'),0),((1,'b'),0)],
-                      dalphabet = NonEmpty.fromList "ab"} 
-
-unreachableDFA2 =  DFA {dstart = 0, 
-                        dstates = Set.fromList [0,1,2,3,4,5,6],
-                        daccept = Set.fromList [2,3,4],
-                        dtransition = Map.fromList [((0,'0'),1),
-                                                    ((0,'1'),2),
-                                                    ((1,'0'),0),
-                                                    ((1,'1'),3),
-                                                    ((2,'0'),4),
-                                                    ((2,'1'),5),
-                                                    ((3,'0'),4),
-                                                    ((3,'1'),5),
-                                                    ((4,'0'),4),
-                                                    ((4,'1'),5),
-                                                    ((5,'0'),5),
-                                                    ((5,'1'),5),
-                                                    ((6,'1'),5),
-                                                    ((6,'0'),6)],
-                        dalphabet = NonEmpty.fromList "01"}                            
+                              $ allPairs $ Set.toList $ dstates d                      
 
 -- TODO: more tests
 testDfaMinimization :: Test
@@ -373,7 +333,7 @@ indistinct d1 s1 s2 =
       matches x acc = 
         let transitions = dtransition dfa in
         case (Map.lookup (s1,x) transitions, Map.lookup (s2,x) transitions) of
-          (Just a, Just b) -> acc && (a == b || a == s2 || b == s1)
+          (Just a, Just b) -> acc && (a == b || (a == s2 && b == s1))
           _ -> False 
 
 testIndistinct :: Test
@@ -386,9 +346,10 @@ testIndistinct = "Determines if states are indistinct" ~:
 
 -- return True when r matches the empty string
 nullable :: RegExp -> Bool
-nullable Empty  = True
-nullable (Star _) = True
-nullable _      = False
+nullable Empty       = True
+nullable (Star _)    = True
+nullable (Alt r1 r2) = nullable r1 || nullable r2
+nullable _           = False
 
 -- |  Takes a regular expression `r` and a character `c`,
 -- and computes a new regular expression that accepts word `w` if `cw` is

@@ -27,7 +27,7 @@ import Test.QuickCheck.Function
 import Debug.Trace
 
 chars, validDotComMail :: RegExp
-chars           = [regex|[a-z]|[A-Z]|[0-9]|[-_.]|]
+chars           = [regex|[0-9]|]
 validDotComMail = [regex|${plus chars}@${plus chars}.com|]
  
 plus :: RegExp -> RegExp
@@ -70,6 +70,8 @@ testConstructionsIsomorphic =
       ~?= brzozowskiConstruction (rSeq (rChar "a") (rChar "b")),
     thompsonConstruction (rStar (rChar "a")) 
       ~?= brzozowskiConstruction (rStar (rChar "a")),
+    thompsonConstruction (rAlt (rChar "a") (rStar (rChar "b")))
+      ~?= brzozowskiConstruction (rAlt (rChar "1") (rStar (rChar "1"))),
     thompsonConstruction validDotComMail 
       ~?= brzozowskiConstruction validDotComMail
   ]
@@ -82,12 +84,11 @@ instance Arbitrary ZOString where
       ZOString <$> sequence [ (choose ('0','1')) | _ <- [1..k]]
 
 instance Arbitrary RegExp where
-   arbitrary = oneof [rChar <$> sublistOf "01",
-                      rAlt <$> arbitrary <*> arbitrary, 
-                      rSeq <$> arbitrary <*> arbitrary,
-                      rStar <$> arbitrary, 
-                      return Empty,
-                      return Void]
+   arbitrary = frequency [(3, rChar <$> sublistOf "01"),
+                          (1, return Empty),
+                          (1, rAlt <$> arbitrary <*> arbitrary), 
+                          (1, rSeq <$> arbitrary <*> arbitrary),
+                          (1, rStar <$> arbitrary)]
    shrink (Char cs)   = [rChar "0", rChar "1"]
    shrink (Alt r1 r2) = [r1, r2]
    shrink (Seq r1 r2) = [r1, r2]
