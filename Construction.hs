@@ -184,7 +184,7 @@ testDfaConstruction = "DFA correctly constructed from NFA" ~:
            dalphabet = NonEmpty.fromList "ab"}]
 
 dfaMinimization :: DFA -> DFA
-dfaMinimization d = mergePair (deleteUnreachable d (Set.toList (dstates d))) 
+dfaMinimization d = updateStateSet $ mergePair (deleteUnreachable d (Set.toList (dstates d))) 
                               $ allPairs $ Set.toList $ dstates d
 
 excessDFA = DFA {dstart = 0, 
@@ -235,14 +235,14 @@ testDfaMinimization = "Resulting DFA is minimized" ~:
   TestList[
     dfaMinimization (excessDFA) ~?= 
     DFA {dstart = 0, 
-         dstates = Set.fromList [0,2,5],
-         daccept = Set.fromList [2],
+         dstates = Set.fromList [0,1,2],
+         daccept = Set.fromList [1],
          dtransition = Map.fromList [((0,'0'),0),
-                                     ((0,'1'),2),
+                                     ((0,'1'),1),
+                                     ((1,'0'),1),
+                                     ((1,'1'),2),
                                      ((2,'0'),2),
-                                     ((2,'1'),5),
-                                     ((5,'0'),5),
-                                     ((5,'1'),5)],
+                                     ((2,'1'),2)],
          dalphabet = NonEmpty.fromList "01"},
 
     dfaMinimization (DFA {dstart = 0, 
@@ -263,10 +263,31 @@ testDfaMinimization = "Resulting DFA is minimized" ~:
     emptySetDfa (NonEmpty.fromList "ab")
   ]
 
+getIndex :: [QState] -> QState -> Int 
+getIndex list state = case (List.elemIndex state list) of 
+                        Nothing -> -1 
+                        Just a -> a   
+
 updateStateSet :: DFA -> DFA
-updateStateSet d = let states = Set.toAscList $ dstates d in
-                      updateState :: [QState] -> [QState]
-                      updateState states = List.map (\x -> states !! x) states  
+updateStateSet d = let states = Set.toAscList $ dstates d
+                       statemap = updateState states where
+                                  updateState :: [QState] -> Map Int QState
+                                  updateState states = foldr (\x -> Map.insert x (getIndex states x)) Map.empty states 
+                   in  
+                   DFA {dstart = case Map.lookup (dstart d) statemap of 
+                                      Nothing -> 0
+                                      Just a -> a,
+                                 dstates = Set.fromList $ fmap (\(k,v) -> v) (Map.toList statemap),
+                                 daccept = Set.fromList $ fmap (\x -> (case (Map.lookup x statemap) of 
+                                                                            Nothing -> x
+                                                                            Just a -> a)) $ Set.toList $ daccept d,  
+                                 dtransition = Map.fromList $ fmap (\((a,b),c) -> (case (Map.lookup a statemap) of
+                                                                                    Nothing -> ((a,b),c)
+                                                                                    Just v1 -> case (Map.lookup c statemap) of 
+                                                                                                    Nothing -> ((a,b),c)
+                                                                                                    Just v2 ->  ((v1,b),v2))) $ Map.toList $ dtransition d, 
+                                 dalphabet = dalphabet d }
+                   
 
 deleteUnreachable :: DFA -> [QState] -> DFA
 deleteUnreachable d [] = d
