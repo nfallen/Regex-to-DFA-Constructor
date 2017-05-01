@@ -260,7 +260,18 @@ testDfaMinimization = "Resulting DFA is minimized" ~:
                       daccept = Set.empty,
                       dtransition = Map.fromList [((1,'a'),0)],
                       dalphabet = NonEmpty.fromList "ab"}) ~?=
-    emptySetDfa (NonEmpty.fromList "ab")
+    emptySetDfa (NonEmpty.fromList "ab"),
+
+    dfaMinimization (DFA {dstart = 0,
+                          dstates = Set.fromList [0,1,2],
+                          daccept = Set.fromList [0,1],
+                          dtransition = Map.fromList [((0,'0'),1), ((1,'0'),2),((2,'0'),2)],
+                          dalphabet = NonEmpty.fromList "01"}) ~?= 
+                     DFA {dstart = 0,
+                          dstates = Set.fromList [0,1,2],
+                          daccept = Set.fromList [0,1],
+                          dtransition = Map.fromList [((0,'0'),1), ((1,'0'),2),((2,'0'),2)],
+                          dalphabet = NonEmpty.fromList "01"}
   ]
 
 getIndex :: [QState] -> QState -> Int 
