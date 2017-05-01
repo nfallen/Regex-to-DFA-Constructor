@@ -2,3 +2,4 @@ Dependencies
 
 cabal install parsec
 cabal install set-monad
+cabal install criterion

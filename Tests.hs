@@ -71,7 +71,9 @@ testConstructionsIsomorphic =
     thompsonConstruction (rStar (rChar "a")) 
       ~?= brzozowskiConstruction (rStar (rChar "a")),
     thompsonConstruction (rAlt (rChar "a") (rStar (rChar "b")))
-      ~?= brzozowskiConstruction (rAlt (rChar "1") (rStar (rChar "1"))),
+      ~?= brzozowskiConstruction (rAlt (rChar "a") (rStar (rChar "b"))),
+    thompsonConstruction (rSeq (rAlt (rChar "1") Empty) (rChar "0"))
+      ~?= brzozowskiConstruction (rSeq (rAlt (rChar "1") Empty) (rChar "0")),
     thompsonConstruction validDotComMail 
       ~?= brzozowskiConstruction validDotComMail
   ]

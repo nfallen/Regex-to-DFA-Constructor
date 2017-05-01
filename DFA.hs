@@ -222,8 +222,32 @@ testEqDFA = "test isomorphic DFA" ~:
              dtransition = Map.fromList [((0,'1'),1),
                                      ((1,'1'),1)], 
              dalphabet = return '1'}
-          ~?= False
-
+          ~?= False,
+        DFA {dstart = 0, 
+             dstates = Set.fromList [0,1,2,3],
+             daccept = Set.fromList [2],
+             dtransition = Map.fromList [((0,'a'),1),
+                                         ((0,'b'),3),
+                                         ((1,'a'),3),
+                                         ((1,'b'),2),
+                                         ((2,'a'),3),
+                                         ((2,'b'),3),
+                                         ((3,'a'),3),
+                                         ((3,'b'),3)],
+             dalphabet = NonEmpty.fromList "ab"}
+        == DFA {dstart = 0, 
+                dstates = Set.fromList [0,1,2,3],
+                daccept = Set.fromList [3],
+                dtransition = Map.fromList [((0,'a'),1),
+                                        ((0,'b'),2),
+                                        ((1,'a'),2),
+                                        ((1,'b'),3),
+                                        ((2,'a'),2),
+                                        ((2,'b'),2),
+                                        ((3,'a'),2),
+                                        ((3,'b'),2)],
+                dalphabet = NonEmpty.fromList "ab"}
+          ~?= True
       ]
 
 main :: IO ()
