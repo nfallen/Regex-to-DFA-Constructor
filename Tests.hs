@@ -141,7 +141,6 @@ propNfaDfaAcceptSame regexp s = let thomNfa = thompsonNfaConstruction regexp in
 
 test :: IO ()
 test = do
-    testAlpha
     Automata.test
     DFA.test
     NFA.test 

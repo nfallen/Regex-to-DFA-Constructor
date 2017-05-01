@@ -1,5 +1,5 @@
 {-# OPTIONS -fwarn-incomplete-patterns -fwarn-tabs #-}
-{-# LANGUAGE NoImplicitPrelude, PatternSynonyms, FlexibleInstances, ScopedTypeVariables, TemplateHaskell, QuasiQuotes #-}
+{-# LANGUAGE NoImplicitPrelude, PatternSynonyms, FlexibleInstances, ScopedTypeVariables, TemplateHaskell, QuasiQuotes , DeriveGeneric, DeriveAnyClass #-}
 
 -- https://wiki.haskell.org/A_practical_Template_Haskell_Tutorial#Template_Haskell_for_building_Embedded_Domain_specific_Languages_.28EDSLs.29
 
@@ -13,6 +13,9 @@ import Data.Set.Monad (Set)
 import qualified Data.Set.Monad as Set (singleton, empty, fromList, toList, member, delete)
 
 import Data.List (nub)
+
+import GHC.Generics (Generic)
+import Control.DeepSeq
 
 import Data.List.NonEmpty (nonEmpty, NonEmpty) 
 import qualified Data.List.NonEmpty as NonEmpty (fromList, toList)
@@ -43,7 +46,7 @@ data RegExp = CharExp (NonEmpty Char)      -- single literal character
             | Empty                -- ε, accepts empty string
             | Void                 -- ∅, always fails
             | Var String           -- a variable holding another regexp
-  deriving (Eq, Ord)
+  deriving (Eq, Ord, GHC.Generics.Generic, NFData)
 
 instance Show RegExp where
   show (CharExp cs)   = "(rChar \"" ++ NonEmpty.toList cs ++ "\")"

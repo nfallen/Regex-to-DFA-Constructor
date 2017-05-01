@@ -18,14 +18,16 @@ import Test.HUnit (Test(..), (~:), (~?=), runTestTT, assertBool)
 
 import Alpha
 
+-- / Represents an NFA/DFA state 
 type QState = Int
 
+-- / Represents full set of states in NFA/DFA
 type QStates = Set QState
 
 class Automata a where
   decideString :: a -> String -> Maybe Bool
 
-
+-- / Creates list of all mapping permutations between the states of s1 and the states of s2 
 stateBijections :: QStates -> QStates -> [Map QState QState]
 stateBijections s1 s2 = let xs = Set.toList s1 
                             perms = List.permutations (Set.toList s2) in 
