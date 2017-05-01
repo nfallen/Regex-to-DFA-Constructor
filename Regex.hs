@@ -34,6 +34,10 @@ import qualified Language.Haskell.TH as TH
 import Language.Haskell.TH.Syntax
 import Language.Haskell.TH.Quote
 
+import Test.HUnit (Test(..), (~:), (~?=), runTestTT, assertBool)
+import Test.QuickCheck
+import Test.QuickCheck.Function hiding (apply) 
+
 pattern Char a <- CharExp a
 pattern Alt a1 a2 <- AltExp a1 a2
 pattern Seq a1 a2 <- SeqExp a1 a2
@@ -57,33 +61,61 @@ instance Show RegExp where
   show Void           = "Void"
   show (Var s)        = "(Var " ++ s ++ ")"
 
-orderedAlt :: RegExp -> RegExp -> RegExp
-orderedAlt r1 r2 = if r1 < r2 then AltExp r1 r2 else AltExp r2 r1
+instance Arbitrary RegExp where
+   arbitrary = frequency [(3, rChar <$> sublistOf "01"),
+                          (1, return Empty),
+                          (1, rAlt <$> arbitrary <*> arbitrary), 
+                          (1, rSeq <$> arbitrary <*> arbitrary),
+                          (1, rStar <$> arbitrary)]
+   -- shrink (Char cs)   = [rChar "0", rChar "1"]
+   -- shrink (Alt r1 r2) = [r1, r2]
+   -- shrink (Seq r1 r2) = [r1, r2]
+   -- shrink (Star r)    = [r]
+   -- shrink _           = []
+
+assocAlt :: RegExp -> RegExp -> RegExp
+assocAlt r1 r2 = 
+  case (r1, r2) of
+    (AltExp a1 a2, _) -> 
+      if a1 == r2 || a2 == r2
+      then rAlt a1 a2
+      else AltExp r1 r2  
+    (_, AltExp a1 a2) -> 
+      if a1 == r1 || a2 == r1
+      then rAlt a1 a2
+      else AltExp (rAlt r1 a1) a2 
+    _ -> AltExp r1 r2
 
 rAlt :: RegExp -> RegExp -> RegExp
 rAlt Void x = x
 rAlt x Void = x
 rAlt (StarExp r) Empty = StarExp r
 rAlt Empty (StarExp r) = StarExp r
-rAlt r1@(StarExp s1) r2@(SeqExp p (StarExp s2)) = 
-  if (s1 == p && p == s2) then r1
-    else orderedAlt r1 r2
-rAlt r1@(SeqExp p (StarExp s1)) r2@(StarExp s2) = 
-  if (s1 == p && p == s2) then r2
-    else orderedAlt r1 r2
 rAlt r1 r2 
   | r1 == r2  = r1
   | otherwise = 
-    case (r1, r2) of
-      (AltExp a1 a2, _) -> 
-        if a1 == r2 || a2 == r2
-        then rAlt a1 a2
-        else orderedAlt r1 r2  
-      (_, AltExp a1 a2) -> 
-        if a1 == r1 || a2 == r1
-        then rAlt a1 a2
-        else orderedAlt (rAlt r1 a1) a2 
-      _ -> orderedAlt r1 r2
+      if r1 < r2 then assocAlt r1 r2 else assocAlt r2 r1
+
+-- Tests for Brzowski equivalence properties that guarantee convergence
+testRAlt :: Test
+testRAlt = "test ralt regex construction" ~:
+  TestList [
+    rAlt (rAlt (rChar "0") (rChar "1")) (rChar "2") ~?=
+      rAlt (rChar "0") (rAlt (rChar "1") (rChar "2")),
+    rAlt (rAlt (rChar "0") Empty) (rChar "2") ~?=
+      rAlt (rChar "0") (rAlt Empty (rChar "2")),
+    rAlt (rChar "0") (rChar "1") ~?= rAlt (rChar "1") (rChar "0"),
+    rAlt (rChar "0") (rChar "0") ~?= (rChar "0")
+  ]
+
+propAltEqual :: RegExp -> Bool
+propAltEqual r = rAlt r r == r
+
+propAltAssoc :: RegExp -> RegExp -> RegExp -> Bool
+propAltAssoc r1 r2 r3 = rAlt (rAlt r1 r2) r3 == rAlt r1 (rAlt r2 r3)
+
+propAltFlip :: RegExp -> RegExp -> Bool
+propAltFlip r1 r2 = rAlt r1 r2 == rAlt r2 r1
 
 rSeq :: RegExp -> RegExp -> RegExp
 rSeq Void _ = Void -- concatenating any string to void is void 
@@ -155,3 +187,11 @@ instance Lift RegExp where
  
 apply :: Name -> [Q Exp] -> Q Exp
 apply n = foldl TH.appE (TH.conE n)
+
+test :: IO ()
+test = do
+    runTestTT $ testRAlt
+    quickCheck $ propAltEqual
+    quickCheck $ propAltAssoc
+    quickCheck $ propAltFlip
+    return ()

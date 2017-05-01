@@ -108,18 +108,6 @@ instance Arbitrary ZOString where
       (k :: Int) <- choose (0, 50)
       ZOString <$> sequence [ (choose ('0','1')) | _ <- [1..k]]
 
-instance Arbitrary RegExp where
-   arbitrary = frequency [(3, rChar <$> sublistOf "01"),
-                          (1, return Empty),
-                          (1, rAlt <$> arbitrary <*> arbitrary), 
-                          (1, rSeq <$> arbitrary <*> arbitrary),
-                          (1, rStar <$> arbitrary)]
-   shrink (Char cs)   = [rChar "0", rChar "1"]
-   shrink (Alt r1 r2) = [r1, r2]
-   shrink (Seq r1 r2) = [r1, r2]
-   shrink (Star r)    = [r]
-   shrink _           = []
-
 propIndistinguishable :: RegExp -> ZOString -> Bool
 propIndistinguishable regexp s = 
   let thomDfa = dfaConstruction $ thompsonNfaConstruction regexp in
