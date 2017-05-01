@@ -4,8 +4,7 @@
 module Comparison where 
 
 import Prelude 
-import Language.Haskell.TH
-import Control.DeepSeq
+--import Control.DeepSeq.TH
 
 import Regex
 import Alpha
@@ -17,14 +16,14 @@ import Tests
 
 import Criterion.Main
 
-deriveNFData ''DFA
+--deriveNFData ''DFA
 
 main :: IO()
 main = defaultMain [
-		 bench "thompsonConstruction [regex|(0|1)*|]" $ nf thompsonConstruction [regex|(0|1)*|],
-		 bench "brzozowskiConstruction [regex|(0|1)*|]" $ nf brzozowskiConstruction [regex|(0|1)*|],
-		 bench "thompsonConstruction validDotComMail" $ nf thompsonConstruction validDotComMail,
-		 bench "brzozowskiConstruction validDotComMail" $ nf brzozowskiConstruction validDotComMail,
+		 bench "thompsonConstruction (0|1)*" $ whnf thompsonConstruction [regex|(0|1)*|],
+		 bench "brzozowskiConstruction (0|1)*" $ whnf brzozowskiConstruction [regex|(0|1)*|],
+		 bench "thompsonConstruction Valid E-Mail" $ whnf thompsonConstruction validDotComMail,
+		 bench "brzozowskiConstruction Valid E-Mail" $ whnf brzozowskiConstruction validDotComMail,
 		 bench "thompsonConstruction (ab)*|b*" $ whnf thompsonConstruction (rAlt (rStar (rSeq (rChar "a") (rChar "b"))) 
                     (rStar (rChar "b"))),
 		 bench "brzozowskiConstruction (ab)*|b*" $ whnf brzozowskiConstruction (rAlt (rStar (rSeq (rChar "a") (rChar "b"))) 
