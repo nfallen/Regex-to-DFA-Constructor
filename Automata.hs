@@ -1,6 +1,4 @@
 ---------------------------------------------------------------------------      
--- Regina Burd, Nova Fallen
--- CIS 552 Project
 
 module Automata where
 

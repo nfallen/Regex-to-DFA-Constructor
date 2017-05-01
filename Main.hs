@@ -1,6 +1,9 @@
 {-# OPTIONS -fwarn-incomplete-patterns -fwarn-tabs #-}
 {-# LANGUAGE NoImplicitPrelude, FlexibleInstances, ScopedTypeVariables, TemplateHaskell, QuasiQuotes #-}
 
+-- Regina Burd, Nova Fallen
+-- CIS 552 Project
+
 module Main where
 
 import Prelude
