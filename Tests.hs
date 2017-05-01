@@ -120,6 +120,25 @@ instance Arbitrary RegExp where
    shrink (Star r)    = [r]
    shrink _           = []
 
+propIndistinguishable :: RegExp -> ZOString -> Bool
+propIndistinguishable regexp s = 
+  let thomDfa = dfaConstruction $ thompsonNfaConstruction regexp in
+  case mergeIndistinguishable thomDfa of 
+    Nothing -> False
+    Just minDfa -> 
+      decideString thomDfa (str s) == decideString minDfa (str s)
+
+propMinimization :: RegExp -> ZOString -> Bool
+propMinimization regexp s = 
+  let thomDfa = dfaConstruction $ thompsonNfaConstruction regexp
+      minDfa = dfaMinimization thomDfa in
+  decideString thomDfa (str s) == decideString minDfa (str s)
+
+propNfaDfaAcceptSame :: RegExp -> ZOString -> Bool
+propNfaDfaAcceptSame regexp s = let thomNfa = thompsonNfaConstruction regexp in
+                                let thomDfa = dfaConstruction thomNfa in
+                                decideString thomNfa (str s) == decideString thomDfa (str s)
+
 -- On any arbitrary regular expression, the two construction algorithms produce isomorphic DFAs
 propIsomorphic :: RegExp -> Bool
 propIsomorphic regexp = thompsonConstruction regexp == brzozowskiConstruction regexp
@@ -131,17 +150,11 @@ propAcceptSame regexp s = let thomDfa = thompsonConstruction regexp
                               brzDfa = brzozowskiConstruction regexp
                           in decideString brzDfa (str s) == decideString thomDfa (str s)
 
-propNfaDfaAcceptSame :: RegExp -> ZOString -> Bool
-propNfaDfaAcceptSame regexp s = let thomNfa = thompsonNfaConstruction regexp in
-                                let thomDfa = dfaConstruction thomNfa in
-                                decideString thomNfa (str s) == decideString thomDfa (str s)
-
 -- TODO: generate arbitrary strings that match regexes using QuickCheck and make sure the
 -- generated DFAs accept
 
 test :: IO ()
 test = do
-    testAlpha
     Automata.test
     DFA.test
     NFA.test 
@@ -149,6 +162,9 @@ test = do
     runTestTT $ TestList [testBrzozowskiConstruction,
                           testThompsonConstruction,
                           testConstructionsIsomorphic]
-    quickCheck $ propIsomorphic
-    quickCheck $ propAcceptSame
+
     quickCheck $ propNfaDfaAcceptSame
+    quickCheck $ propIndistinguishable
+    quickCheck $ propMinimization
+    quickCheck $ propAcceptSame
+    quickCheck $ propIsomorphic
