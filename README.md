@@ -4,7 +4,7 @@ Nova Fallen - nfallen
 
 Execution: 
 
-The program is executed from Main.hs. Here the user will be able to entire a regular expression and
+The program is executed from Main.hs. Here the user will be able to enter a regular expression and
 choose whether to derive a DFA for this expression via the thompson or brzozowski construction. If
 the regular expression is successfully parsed and the DFA is successfully created, the user will be able
 to enter a string to see if it is accepted by the DFA. Here the user will also have the option of simply executing
@@ -23,12 +23,12 @@ helper functions used to manipulate this type.
 The Automata class (to which both DFA and NFA instances belong) is defined in Automata.hs, 
 along with the stateBijections helper method, which determines all mapping permutations between state sets.
 
-The source code for the DFA data type and the methods to manipulate it is located in the DFA.hs file. 
+The source code for the DFA data type and the methods to manipulate it are located in the DFA.hs file. 
 
-The source code for the NFA data type and the methods to manipulate it is located in the NFA.hs file.
+The source code for the NFA data type and the methods to manipulate it are located in the NFA.hs file.
 
 The code to create an NFA using the thompson construction algorithm, along with methods to convert the 
-resulting NFA to a DFA, and to minimize the DFA are located in the Construction.hs file. 
+resulting NFA to a DFA, and to minimize the resulting DFA are located in the Construction.hs file. 
 Construction.hs also holds the source code for the brzozowski construction.   
 
 Tests.hs contains unit tests and quickcheck properties testing the correctness of the code. 
