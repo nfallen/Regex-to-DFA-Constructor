@@ -35,6 +35,8 @@ thompsonNfaConstruction r = construction r (alpha r) where
   construction Empty ab = emptyStringNfa ab
   construction Void  ab = emptySetNfa ab
   construction (Char cs) ab = foldr1 (\n1 n2 -> unionNfa n1 n2) (singleCharNfa <$> cs)
+  construction (Alt Empty r2) ab = acceptsEmptyNfa (construction r2 ab)
+  construction (Alt r1 Empty) ab = acceptsEmptyNfa (construction r1 ab)
   construction (Alt r1 r2) ab = unionNfa (construction r1 ab) (construction r2 ab) 
   construction (Seq r1 r2) ab = concatNfa (construction r1 ab) (construction r2 ab) 
   construction (Star r) ab = kleeneNfa (construction r ab)
@@ -80,22 +82,35 @@ testThompsonNfaConstruction = "thompson construction of NFA from regex" ~:
           nstart = 0, 
           nstates = Set.fromList [0,1,2,3,4,5,6,7,8,9,10,11],
           naccept = Set.fromList [11],
-          ntransition = Map.fromList [((0,Nothing), Set.fromList [1,7]),
-                                      ((1,Nothing), Set.fromList [2,6]),
-                                      ((2,Just 'a'), Set.fromList [3]),
-                                      ((3,Nothing), Set.fromList [4]),
-                                      ((4,Just 'b'), Set.fromList [5]),
-                                      ((5,Nothing), Set.fromList [2,6]),
-                                      ((6,Nothing), Set.fromList [11]),
-                                      ((7,Nothing), Set.fromList [8,10]),
-                                      ((8,Just 'b'), Set.fromList [9]),
-                                      ((9,Nothing), Set.fromList [8,10]),
-                                      ((10,Nothing), Set.fromList [11])], 
-          nalphabet = NonEmpty.fromList "ab"}]
+          ntransition = Map.fromList [((0,Nothing),Set.fromList [1,5]),
+                                      ((1,Nothing),Set.fromList [2,4]),
+                                      ((2,Just 'b'),Set.fromList [3]),
+                                      ((3,Nothing),Set.fromList [2,4]),
+                                      ((4,Nothing),Set.fromList [11]),
+                                      ((5,Nothing),Set.fromList [6,10]),
+                                      ((6,Just 'a'),Set.fromList [7]),
+                                      ((7,Nothing),Set.fromList [8]),
+                                      ((8,Just 'b'),Set.fromList [9]),
+                                      ((9,Nothing),Set.fromList [6,10]),
+                                      ((10,Nothing),Set.fromList [11])], 
+          nalphabet = NonEmpty.fromList "ba"}]
 
 data DFASt a = DFASt { qStateCounter :: Int, 
                        qCorr  :: Map a QState,
                        getDfa :: DFA } deriving (Eq, Show)
+
+initDfaSt :: Alpha -> DFASt a
+initDfaSt ab = 
+  let initDfa = DFA {
+    dstart = 0, 
+    dstates = Set.empty, 
+    daccept = Set.empty,
+    dtransition = Map.empty, 
+    dalphabet = ab }
+  in DFASt {
+    qStateCounter = 0,
+    qCorr = Map.empty,
+    getDfa = initDfa}
 
 lookupUpdate :: Ord a => a -> State (DFASt a) (QState, Bool)
 lookupUpdate x = do
@@ -146,17 +161,7 @@ dfaStateConstruction nfa (Just nq) = do
 dfaConstruction :: NFA -> DFA 
 dfaConstruction nfa = 
   let initStateSet = Just $ epsilonReachable nfa $ Set.singleton (nstart nfa)
-      initDfa = DFA {
-        dstart = 0, 
-        dstates = Set.empty, 
-        daccept = Set.empty,
-        dtransition = Map.empty, 
-        dalphabet = nalphabet nfa }
-      initDfaSt = DFASt {
-                    qStateCounter = 0,
-                    qCorr = Map.empty,
-                    getDfa = initDfa}
-      dst = execState (dfaStateConstruction nfa initStateSet) initDfaSt
+      dst = execState (dfaStateConstruction nfa initStateSet) (initDfaSt $ nalphabet nfa)
       accepts = getAcceptStates (\nq -> acceptsSomeState nfa nq) (qCorr dst)
   in withAccepts accepts (getDfa dst)
 
@@ -186,48 +191,6 @@ testDfaConstruction = "DFA correctly constructed from NFA" ~:
 dfaMinimization :: DFA -> DFA
 dfaMinimization d = updateStateSet $ mergePair (deleteUnreachable d (Set.toList (dstates d))) 
                               $ allPairs $ Set.toList $ dstates d
-
-excessDFA = DFA {dstart = 0, 
-                 dstates = Set.fromList [0,1,2,3,4,5],
-                 daccept = Set.fromList [2,3,4],
-                 dtransition = Map.fromList [((0,'0'),1),
-                                             ((0,'1'),2),
-                                             ((1,'0'),0),
-                                             ((1,'1'),3),
-                                             ((2,'0'),4),
-                                             ((2,'1'),5),
-                                             ((3,'0'),4),
-                                             ((3,'1'),5),
-                                             ((4,'0'),4),
-                                             ((4,'1'),5),
-                                             ((5,'0'),5),
-                                             ((5,'1'),5)],
-                 dalphabet = NonEmpty.fromList "01"}  
-
-unreachableDFA = DFA {dstart = 0,
-                      dstates = Set.fromList [0,1],
-                      daccept = Set.empty,
-                      dtransition = Map.fromList[((1,'a'),0),((1,'b'),0)],
-                      dalphabet = NonEmpty.fromList "ab"} 
-
-unreachableDFA2 =  DFA {dstart = 0, 
-                        dstates = Set.fromList [0,1,2,3,4,5,6],
-                        daccept = Set.fromList [2,3,4],
-                        dtransition = Map.fromList [((0,'0'),1),
-                                                    ((0,'1'),2),
-                                                    ((1,'0'),0),
-                                                    ((1,'1'),3),
-                                                    ((2,'0'),4),
-                                                    ((2,'1'),5),
-                                                    ((3,'0'),4),
-                                                    ((3,'1'),5),
-                                                    ((4,'0'),4),
-                                                    ((4,'1'),5),
-                                                    ((5,'0'),5),
-                                                    ((5,'1'),5),
-                                                    ((6,'1'),5),
-                                                    ((6,'0'),6)],
-                        dalphabet = NonEmpty.fromList "01"}                            
 
 -- TODO: more tests
 testDfaMinimization :: Test
@@ -416,7 +379,7 @@ indistinct d1 s1 s2 =
       matches x acc = 
         let transitions = dtransition dfa in
         case (Map.lookup (s1,x) transitions, Map.lookup (s2,x) transitions) of
-          (Just a, Just b) -> acc && (a == b || a == s2 || b == s1)
+          (Just a, Just b) -> acc && (a == b || (a == s2 && b == s1))
           _ -> False 
 
 testIndistinct :: Test
@@ -429,9 +392,11 @@ testIndistinct = "Determines if states are indistinct" ~:
 
 -- return True when r matches the empty string
 nullable :: RegExp -> Bool
-nullable Empty  = True
-nullable (Star _) = True
-nullable _      = False
+nullable Empty       = True
+nullable (Star _)    = True
+nullable (Alt r1 r2) = nullable r1 || nullable r2
+nullable (Seq r1 r2) = nullable r1 && nullable r2
+nullable _           = False
 
 -- |  Takes a regular expression `r` and a character `c`,
 -- and computes a new regular expression that accepts word `w` if `cw` is
@@ -444,10 +409,20 @@ deriv (Alt r1 Empty) c       = deriv r1 c
 deriv (Alt r1 r2) c          = rAlt (deriv r1 c) (deriv r2 c)
 deriv (Seq Empty r2) c       = deriv r2 c
 deriv (Seq r1 Empty) c       = deriv r1 c
-deriv (Seq sr@(Star _) r2) c = rAlt (deriv sr c `rSeq` r2) (deriv r2 c)
-deriv (Seq r1 r2) c          = deriv r1 c `rSeq` r2
+deriv (Seq r1 r2) c          = let d = deriv r1 c `rSeq` r2 in
+                               if nullable r1
+                               then rAlt d (deriv r2 c)
+                               else d
 deriv (Star r) c             = deriv r c `rSeq` rStar r
 deriv Void _ = Void
+
+testDeriv :: Test
+testDeriv = "test computing regex derivatives" ~:
+  TestList [
+    deriv (rSeq (rAlt (rChar "1") Empty) (rChar "0")) '0' ~?= Empty,
+    deriv (rSeq (rStar (rChar "1")) (rChar "0")) '0' ~?= Empty,
+    deriv (rSeq (rChar "1") (rChar "0")) '0' ~?= Void
+  ]
 
 brzozowskiStateConstruction :: Alpha -> Maybe RegExp -> State (DFASt (RegExp)) ()
 brzozowskiStateConstruction ab Nothing  = return ()
@@ -461,23 +436,13 @@ brzozowskiStateConstruction ab (Just r) = do
 brzozowskiConstruction :: RegExp -> DFA
 brzozowskiConstruction r = 
   let ab = alpha r
-      initDfa = DFA {
-        dstart = 0, 
-        dstates = Set.empty, 
-        daccept = Set.empty,
-        dtransition = Map.empty, 
-        dalphabet = ab }
-      initDfaSt = DFASt {
-                    qStateCounter = 0,
-                    qCorr = Map.empty,
-                    getDfa = initDfa}
-      dst = execState (brzozowskiStateConstruction ab (Just r)) initDfaSt
+      dst = execState (brzozowskiStateConstruction ab (Just r)) (initDfaSt ab)
       accepts = getAcceptStates nullable (qCorr dst)
-  in withAccepts accepts (getDfa dst)
+  in dfaMinimization $ withAccepts accepts (getDfa dst)
 
 main :: IO ()
 main = do
     runTestTT $ TestList [testDfaConstruction, testThompsonNfaConstruction, testDfaMinimization,
                           testDeleteUnreachable, testInwardTransition, testDeleteKey,
-                          testAllPairs, testIndistinct, testMergeIndistinct ]
+                          testAllPairs, testIndistinct, testMergeIndistinct, testDeriv ]
     return ()
