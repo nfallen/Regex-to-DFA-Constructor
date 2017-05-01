@@ -35,6 +35,7 @@ data NFA = NFA { nstart :: QState,
                  nalphabet :: Alpha
                } deriving (Show)
 
+-- This NFA rejects all inputs
 emptySetNfa :: Alpha -> NFA
 emptySetNfa ab = NFA {nstart = 0,
                    nstates = Set.singleton 0,
@@ -42,6 +43,7 @@ emptySetNfa ab = NFA {nstart = 0,
                    ntransition = Map.empty,
                    nalphabet = ab}
 
+-- This NFA accepts the empty string 
 emptyStringNfa :: Alpha -> NFA
 emptyStringNfa ab = NFA {nstart = 1,
                       nstates = Set.fromList [0,1],
@@ -59,6 +61,8 @@ unseenQStates qs = do
   put (Set.union seen unseen)
   return unseen
 
+-- takes in an NFA, a set of states and a "maybe char" and returns the 
+-- set of states that are directly reachable from that char  
 oneStepReachable :: NFA -> Set QState -> Maybe Char -> Set QState
 oneStepReachable nfa qs mc = 
   do
