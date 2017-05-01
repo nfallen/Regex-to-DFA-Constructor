@@ -253,8 +253,8 @@ testEqDFA = "test isomorphic DFA" ~:
           ~?= True
       ]
 
-main :: IO ()
-main = do
+test :: IO ()
+test = do
     runTestTT $ TestList [testDecideStringDfa,
                           testStartQStateSame,
                           testTransitionsSame, 

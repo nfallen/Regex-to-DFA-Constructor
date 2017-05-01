@@ -357,8 +357,8 @@ testKleeneNfa = TestList [
                                       ((4,Nothing),Set.fromList [1,5])],
           nalphabet = NonEmpty.fromList "ab"}] 
 
-main :: IO ()
-main = do
+test :: IO ()
+test = do
     runTestTT $ TestList [testSingleCharNfa,
                           testAcceptsEmptyNfa,
                           testUnionNfa,

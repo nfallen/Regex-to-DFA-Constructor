@@ -139,11 +139,13 @@ propNfaDfaAcceptSame regexp s = let thomNfa = thompsonNfaConstruction regexp in
 -- TODO: generate arbitrary strings that match regexes using QuickCheck and make sure the
 -- generated DFAs accept
 
-main :: IO ()
-main = do
-    DFA.main 
-    NFA.main 
-    Construction.main 
+test :: IO ()
+test = do
+    testAlpha
+    Automata.test
+    DFA.test
+    NFA.test 
+    Construction.test 
     runTestTT $ TestList [testBrzozowskiConstruction,
                           testThompsonConstruction,
                           testConstructionsIsomorphic]

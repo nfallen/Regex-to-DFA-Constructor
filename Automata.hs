@@ -46,8 +46,8 @@ testBijections = "bijections" ~:
                                              Map.fromList [(1,4),(2,6),(3,5)]]
     ] 
 
-main :: IO ()
-main = do
+test :: IO ()
+test = do
     runTestTT $ TestList [testBijections]
     return ()
 

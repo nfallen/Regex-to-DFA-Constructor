@@ -450,8 +450,8 @@ brzozowskiConstruction r =
       accepts = getAcceptStates nullable (qCorr dst)
   in dfaMinimization $ withAccepts accepts (getDfa dst)
 
-main :: IO ()
-main = do
+test :: IO ()
+test = do
     runTestTT $ TestList [testDfaConstruction, testThompsonNfaConstruction, testDfaMinimization,
                           testDeleteUnreachable, testInwardTransition, testDeleteKey,
                           testAllPairs, testIndistinct, testMergeIndistinct, testDeriv ]

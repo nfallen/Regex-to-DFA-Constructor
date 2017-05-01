@@ -1,7 +1,7 @@
 {-# OPTIONS -fwarn-incomplete-patterns -fwarn-tabs #-}
 {-# LANGUAGE NoImplicitPrelude, FlexibleInstances, ScopedTypeVariables, TemplateHaskell, QuasiQuotes #-}
 
-module Execute where
+module Main where
 
 import Prelude
 
@@ -58,7 +58,6 @@ stepper dfa s = go dfa s (dstart dfa) where
                   putStrLn "String rejected."
   go dfa s@(c:cs) q = do
     putStrLn $ "Current state is " ++ show q ++ " and remaining string is " ++ s
-    putStr "imp> "
     str <- getLine
     case str of
       "x"             -> return ()    -- quit the stepper
@@ -75,13 +74,17 @@ stepper dfa s = go dfa s (dstart dfa) where
 useDfa :: DFA -> IO ()
 useDfa dfa = do
   putStrLn "Enter a string to see if it is accepted by the DFA."
+  putStrLn "Type 'x' to exit and enter a new regular expression."
   str <- getLine
-  putStrLn $ "Stepping through DFA execution on string " ++ str
-  putStrLn $ "Type 'x' to stop executing DFA, "
-            ++ "'n' to step forward by one character, "
-            ++ "'c' to continue executing until DFA finishes, "
-            ++ "and 'd' to show the DFA again."
-  stepper dfa str
+  if str == "x" then return ()
+  else do
+    putStrLn $ "Stepping through DFA execution on string " ++ str
+    putStrLn $ "Type 'x' to stop executing DFA, "
+              ++ "'n' to step forward by one character, "
+              ++ "'c' to continue executing until DFA finishes, "
+              ++ "and 'd' to show the DFA again."
+    stepper dfa str
+    useDfa dfa
 
 constructDfa :: RegExp -> IO ()
 constructDfa r = do
