@@ -1,3 +1,5 @@
+-- Representation of the alphabet for an automaton.
+
 {-# OPTIONS -fwarn-tabs #-}
 {-# LANGUAGE NoImplicitPrelude, PatternSynonyms, FlexibleInstances, ScopedTypeVariables, TemplateHaskell, QuasiQuotes #-}
 
@@ -31,6 +33,7 @@ createAlpha (Alt r1 r2) = createAlpha r1 `union` createAlpha r2
 createAlpha (Seq r1 r2) = createAlpha r1 `union` createAlpha r2
 createAlpha (Star r1)   = createAlpha r1
 
+-- Extract the characters in a regex to create an alphabet for it
 alpha :: RegExp -> Alpha
 alpha r = 
   case nonEmpty (createAlpha r) of
@@ -46,4 +49,3 @@ testAlpha = TestList [
           (rChar "a") 
           (rChar "b")) 
   ~?= fromList "ab"]
-  

@@ -113,6 +113,7 @@ initDfaSt ab =
     qCorr = Map.empty,
     getDfa = initDfa}
 
+-- Update the state with a new qstate if it is not there already
 lookupUpdate :: Ord a => a -> State (DFASt a) (QState, Bool)
 lookupUpdate x = do
    dst <- get
@@ -137,6 +138,9 @@ getAcceptStates pred qCorr =
       else []
     in Set.fromList statesList
 
+-- Create a transition from the state associated with x
+-- to the state found by applying the function next to x.
+-- Puts next in the map if it does not yet exist.
 addTransition :: Ord a => (a -> Char -> a) -> (a, Char) -> State (DFASt (a)) (Maybe a)
 addTransition next (x, c) = do
   let x' = next x c
@@ -148,6 +152,9 @@ addTransition next (x, c) = do
     then return $ Just x'
     else return Nothing
 
+-- Constructs DFA by determining the set of states reachable 
+-- from the current set of states in the NFA.
+-- Each set of states in the NFA is mapped to a single state in the DFA.
 dfaStateConstruction :: NFA -> Maybe (Set QState) -> State (DFASt (Set QState)) ()
 dfaStateConstruction nfa Nothing = return ()
 dfaStateConstruction nfa (Just nq) = do
@@ -159,6 +166,7 @@ dfaStateConstruction nfa (Just nq) = do
       sequence_ $ dfaStateConstruction nfa <$> nq's
       return ()
 
+-- Constructs a DFA from an NFA by the power set construction
 dfaConstruction :: NFA -> DFA 
 dfaConstruction nfa = 
   let initStateSet = Just $ epsilonReachable nfa $ Set.singleton (nstart nfa)
@@ -196,7 +204,6 @@ dfaMinimization d =
     Just dfa -> dfa
     Nothing -> reachableDfa
 
--- TODO: more tests
 testDfaMinimization :: Test
 testDfaMinimization = "Resulting DFA is minimized" ~:
   TestList[
@@ -371,28 +378,34 @@ testMergeIndistinct = "Merges indistinct states" ~:
                  dalphabet = NonEmpty.fromList "01"}  
   ]
 
-repartition :: DFA -> [QState] -> [[QState]] -> [[QState]]
-repartition dfa p l = 
-  let nxts = nexts <$> p
-      sorts = List.sortBy (compare `on` fst) nxts
-      groups = List.groupBy ((==) `on` fst) sorts
-      qGroups = fmap (fmap snd) groups
-      in qGroups
-  where 
-    nexts q = 
-      let ab = dalphabet dfa
-          transition = dtransition dfa
-      in ([pGroup (Map.lookup (q,x) (dtransition dfa)) l | x <- NonEmpty.toList ab], q)
-
-    pGroup (Just q') l = findIndex (elem q') l
-    pGroup Nothing _ = Nothing
-
-
+-- Repeatedly partition states by where their transitions lead
+-- in the current partition in order to determine lists
+-- of indistinguishable states
 partitionQs :: DFA -> [[QState]] -> [[QState]]
 partitionQs dfa l = 
     let newPartition = concatMap (\p -> repartition dfa p l) l in
     if newPartition == l then l
       else partitionQs dfa newPartition
+    where 
+    -- Given a list of states, and a list of current partitions,
+    -- repartition them based on where their transitions lead in the
+    -- current partition of all states
+    repartition :: DFA -> [QState] -> [[QState]] -> [[QState]]
+    repartition dfa p l = 
+      let nxts = nexts <$> p
+          sorts = List.sortBy (compare `on` fst) nxts
+          groups = List.groupBy ((==) `on` fst) sorts
+          qGroups = fmap (fmap snd) groups
+          in qGroups
+      where 
+        nexts q = 
+          let ab = dalphabet dfa
+              transition = dtransition dfa
+          in ([pGroup (Map.lookup (q,x) (dtransition dfa)) l 
+              | x <- NonEmpty.toList ab], q)
+
+        pGroup (Just q') l = findIndex (elem q') l
+        pGroup Nothing _ = Nothing
 
 -- Use the moore reduction algorithm 
 -- to calculate sets of indistinguishable states
@@ -404,6 +417,7 @@ mooreReduction dfa =
       initPartition = [accepts, rejects] in 
   partitionQs dfa initPartition
 
+-- Finds indistinguishable states and replaces eac
 mergeIndistinguishable :: DFA -> Maybe DFA
 mergeIndistinguishable dfa = do
   let dls = mooreReduction dfa
@@ -426,6 +440,9 @@ mergeIndistinguishable dfa = do
     dtransition = transition,
     dalphabet = dalphabet dfa}
 
+-- determine if states are equivalent
+-- states must both accept or both reject,
+-- and their transitions either lead to the same states or to each other
 indistinct :: DFA -> QState -> QState -> Bool
 indistinct d1 s1 s2 = 
   let accepts = daccept d1 in
@@ -456,9 +473,6 @@ nullable (Star _)    = True
 nullable (Alt r1 r2) = nullable r1 || nullable r2
 nullable (Seq r1 r2) = nullable r1 && nullable r2
 nullable _           = False
-
-nu :: RegExp -> RegExp
-nu r = if nullable r then Empty else Void
 
 -- |  Takes a regular expression `r` and a character `c`,
 -- and computes a new regular expression that accepts word `w` if `cw` is
@@ -491,6 +505,9 @@ testDeriv = "test computing regex derivatives" ~:
       (rSeq (rStar (rChar "0")) (rStar (rSeq (rChar "0") (rStar (rChar "0")))))
   ]
 
+-- Constructs DFA by determining the regex derivative for each symbol 
+-- at the current regex.
+-- Each regex is associated with a state and equivalent regexes are the same state.
 brzozowskiStateConstruction :: Alpha -> Maybe RegExp -> State (DFASt (RegExp)) ()
 brzozowskiStateConstruction ab Nothing  = return ()
 brzozowskiStateConstruction ab (Just r) = do     
@@ -500,6 +517,8 @@ brzozowskiStateConstruction ab (Just r) = do
   sequence_ $ brzozowskiStateConstruction ab <$> derivs
   return ()
 
+-- Construct a DFA directly from a regular expression
+-- uses the Brzozowski Derivative method
 brzozowskiConstruction :: RegExp -> DFA
 brzozowskiConstruction r = 
   let ab = alpha r
