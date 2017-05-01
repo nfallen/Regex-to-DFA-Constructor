@@ -1,7 +1,9 @@
 {-# OPTIONS -fwarn-incomplete-patterns -fwarn-tabs #-}
 {-# LANGUAGE NoImplicitPrelude, PatternSynonyms, FlexibleInstances, ScopedTypeVariables, TemplateHaskell, QuasiQuotes , DeriveGeneric, DeriveAnyClass #-}
 
+-- Adapted code from 
 -- https://wiki.haskell.org/A_practical_Template_Haskell_Tutorial#Template_Haskell_for_building_Embedded_Domain_specific_Languages_.28EDSLs.29
+-- Last acessed on 5/1
 
 module Regex (regex, RegExp(Empty, Void), 
               pattern Char, pattern Alt, pattern Seq, pattern Star, 
@@ -67,11 +69,11 @@ instance Arbitrary RegExp where
                           (1, rAlt <$> arbitrary <*> arbitrary), 
                           (1, rSeq <$> arbitrary <*> arbitrary),
                           (1, rStar <$> arbitrary)]
-   -- shrink (Char cs)   = [rChar "0", rChar "1"]
-   -- shrink (Alt r1 r2) = [r1, r2]
-   -- shrink (Seq r1 r2) = [r1, r2]
-   -- shrink (Star r)    = [r]
-   -- shrink _           = []
+   shrink (Char cs)   = [rChar "0"]
+   shrink (Alt r1 r2) = [r1, r2]
+   shrink (Seq r1 r2) = [r1, r2]
+   shrink (Star r)    = [r]
+   shrink _           = []
 
 assocAlt :: RegExp -> RegExp -> RegExp
 assocAlt r1 r2 = 
