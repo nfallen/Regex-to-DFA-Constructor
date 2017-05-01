@@ -7,6 +7,7 @@ import Automata
 import DFA
 import NFA
 
+import Data.Function
 import Data.List
 import qualified Data.List as List
 
@@ -189,8 +190,11 @@ testDfaConstruction = "DFA correctly constructed from NFA" ~:
            dalphabet = NonEmpty.fromList "ab"}]
 
 dfaMinimization :: DFA -> DFA
-dfaMinimization d = updateStateSet $ mergePair (deleteUnreachable d (Set.toList (dstates d))) 
-                              $ allPairs $ Set.toList $ dstates d
+dfaMinimization d = 
+  let reachableDfa = deleteUnreachable d (Set.toList (dstates d)) in
+  case mergeIndistinguishable reachableDfa of
+    Just dfa -> dfa
+    Nothing -> reachableDfa
 
 -- TODO: more tests
 testDfaMinimization :: Test
@@ -367,7 +371,60 @@ testMergeIndistinct = "Merges indistinct states" ~:
                  dalphabet = NonEmpty.fromList "01"}  
   ]
 
+repartition :: DFA -> [QState] -> [[QState]] -> [[QState]]
+repartition dfa p l = 
+  let nxts = nexts <$> p
+      sorts = List.sortBy (compare `on` fst) nxts
+      groups = List.groupBy ((==) `on` fst) sorts
+      qGroups = fmap (fmap snd) groups
+      in qGroups
+  where 
+    nexts q = 
+      let ab = dalphabet dfa
+          transition = dtransition dfa
+      in ([pGroup (Map.lookup (q,x) (dtransition dfa)) l | x <- NonEmpty.toList ab], q)
 
+    pGroup (Just q') l = findIndex (elem q') l
+    pGroup Nothing _ = Nothing
+
+
+partitionQs :: DFA -> [[QState]] -> [[QState]]
+partitionQs dfa l = 
+    let newPartition = concatMap (\p -> repartition dfa p l) l in
+    if newPartition == l then l
+      else partitionQs dfa newPartition
+
+-- Use the moore reduction algorithm 
+-- to calculate sets of indistinguishable states
+mooreReduction :: DFA -> [[QState]]
+mooreReduction dfa = 
+  let qs = Set.toList (dstates dfa)
+      accepts = [q | q <- qs, Set.member q (daccept dfa)]
+      rejects = qs \\ accepts
+      initPartition = [accepts, rejects] in 
+  partitionQs dfa initPartition
+
+mergeIndistinguishable :: DFA -> Maybe DFA
+mergeIndistinguishable dfa = do
+  let dls = mooreReduction dfa
+  let q0 = Set.size (dstates dfa)
+  let pairing = List.zip [q0..List.length dls + q0] dls
+  let mapping = Map.fromList $ concatMap (\(i,l) -> [(q,i) | q <- l]) pairing
+  let states = Set.fromList (fst <$> pairing)
+  acceptList <- mapM (\a -> Map.lookup a mapping) $ Set.toList (daccept dfa)
+  start <- Map.lookup (dstart dfa) mapping 
+  let transList = Map.toList (dtransition dfa)
+  transitionKeys <- mapM (\(a,c) -> (\x -> (x,c)) <$> (Map.lookup a mapping)) 
+                    (fmap fst transList)
+  transitionValues <- mapM (\a -> Map.lookup a mapping) 
+                      (fmap snd transList)
+  let transition = Map.fromList (List.zip transitionKeys transitionValues)
+  return DFA {
+    dstart = start,
+    dstates = states,
+    daccept = Set.fromList acceptList,
+    dtransition = transition,
+    dalphabet = dalphabet dfa}
 
 indistinct :: DFA -> QState -> QState -> Bool
 indistinct d1 s1 s2 = 

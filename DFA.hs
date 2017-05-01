@@ -266,6 +266,23 @@ testEqDFA = "test isomorphic DFA" ~:
                                         ((3,'a'),2),
                                         ((3,'b'),2)],
                 dalphabet = NonEmpty.fromList "ab"}
+          ~?= True,
+          DFA {dstart = 0, 
+               dstates = Set.fromList [0,1],
+               daccept = Set.fromList [1], 
+               dtransition = Map.fromList [((0,'0'),1),
+                                           ((0,'1'),1),
+                                           ((1,'0'),1),
+                                           ((1,'1'),1)], 
+               dalphabet = NonEmpty.fromList "01"}
+          == DFA {dstart = 3, 
+                  dstates = Set.fromList [2,3], 
+                  daccept = Set.fromList [2], 
+                  dtransition = Map.fromList [((2,'0'),2),
+                                              ((2,'1'),2),
+                                              ((3,'0'),2),
+                                              ((3,'1'),2)], 
+                  dalphabet = NonEmpty.fromList "01"}
           ~?= True
       ]
 
