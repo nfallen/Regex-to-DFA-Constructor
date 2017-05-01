@@ -17,7 +17,7 @@ Outside of the main method, Main.hs also contains the source code for the DFA st
 Regex.hs defines the RegExp data type for regular expressions, along with any other functions 
 utilized to parse regular expressions.
 
-Alpha.hs holds the 'Alpha' data type, which defines a non-empty set of characters. It also holds 
+Alpha.hs holds the 'Alpha' data type, which represents the automaton alphabet. It also holds 
 helper functions used to manipulate this type.
 
 The Automata class (to which both DFA and NFA instances belong) is defined in Automata.hs, 

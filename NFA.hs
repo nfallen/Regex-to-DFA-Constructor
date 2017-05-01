@@ -71,6 +71,8 @@ oneStepReachable nfa qs mc =
     Just nqs -> nqs
     Nothing  -> Set.empty
 
+-- takes in an NFA and a set of states, and returns set of states that are
+-- reachable by the epsilon transition 
 epsilonReachable :: NFA -> Set QState -> Set QState
 epsilonReachable nfa qs = 
   let (_, rqs) = runState (eReachable nfa qs) Set.empty in rqs
@@ -111,6 +113,8 @@ testSymbolReachable = TestList [
     (Set.fromList [1,3]) 'a'
     ~?= Set.fromList [2]]
 
+-- takes an nfa and a set of states and determine if any of the states that are 
+-- epsilon reachable from this set are accept states 
 acceptsSomeState :: NFA -> Set QState -> Bool
 acceptsSomeState nfa qs = any accept (Set.toList (epsilonReachable nfa qs)) where
                           accept q = Set.member q $ naccept nfa
@@ -166,6 +170,7 @@ instance Eq NFA where
     && ntransition n1 == ntransition n2
     && nstart n1 == nstart n2
 
+-- an NFA that accepts char 
 singleCharNfa :: Char -> NFA 
 singleCharNfa char = 
   let ab = return char
@@ -188,6 +193,7 @@ testSingleCharNfa = TestList [
     nalphabet = return 'a'
   }]
 
+-- takes an NFA and has it accept an empty string 
 acceptsEmptyNfa :: NFA -> NFA
 acceptsEmptyNfa nfa = 
   if (acceptsSomeState nfa (Set.singleton $ nstart nfa))
@@ -225,6 +231,7 @@ testAcceptsEmptyNfa = TestList [
 
   ]
 
+-- Unites two NFAs into one 
 unionNfa :: NFA -> NFA -> NFA
 unionNfa n1 n2 
   | n1 == n2 = n1 
@@ -273,6 +280,7 @@ testUnionNfa = TestList [
       nalphabet = NonEmpty.fromList "ab"
     }]
 
+-- concatenates to NFAs 
 concatNfa :: NFA -> NFA -> NFA
 concatNfa n1 n2 =
   let ab = nalphabet n1 `unionAlpha` nalphabet n2
@@ -321,6 +329,7 @@ testConcatNfa = TestList [
       nalphabet = NonEmpty.fromList "ab"
     }]
 
+--takes an NFA that accepts language x and alters it to accept x* 
 kleeneNfa :: NFA -> NFA
 kleeneNfa n = 
   let lastQStateN = Set.size (nstates n)

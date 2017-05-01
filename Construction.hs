@@ -27,10 +27,12 @@ import Debug.Trace
 
 import Test.HUnit (Test(..), (~:), (~?=), runTestTT, assertBool)  
 
+-- construct a DFA from a regular expression via the thompson construction algorithm
 thompsonConstruction :: RegExp -> DFA
 thompsonConstruction regexp = let nfa = thompsonNfaConstruction regexp
                               in dfaMinimization $ dfaConstruction nfa
 
+-- constructs an NFA from a regular expression
 thompsonNfaConstruction :: RegExp -> NFA
 thompsonNfaConstruction r = construction r (alpha r) where
   construction Empty ab = emptyStringNfa ab
@@ -96,6 +98,7 @@ testThompsonNfaConstruction = "thompson construction of NFA from regex" ~:
                                       ((10,Nothing),Set.fromList [11])], 
           nalphabet = NonEmpty.fromList "ba"}]
 
+-- data type tracking state of DFA in DFA-building process 
 data DFASt a = DFASt { qStateCounter :: Int, 
                        qCorr  :: Map a QState,
                        getDfa :: DFA } deriving (Eq, Show)
@@ -197,6 +200,8 @@ testDfaConstruction = "DFA correctly constructed from NFA" ~:
                                        ((3,'b'),2)],
            dalphabet = NonEmpty.fromList "ab"}]
 
+-- Takes a DFA and minimizes it by deleting all unreachable states
+-- and identifying/merging all indistinguishable states 
 dfaMinimization :: DFA -> DFA
 dfaMinimization d = 
   let reachableDfa = deleteUnreachable d (Set.toList (dstates d)) in
@@ -248,11 +253,14 @@ testDfaMinimization = "Resulting DFA is minimized" ~:
                           dalphabet = NonEmpty.fromList "01"}
   ]
 
+-- helper function that returns element list index if element is 
+-- present in list, -1 is element is absent from list 
 getIndex :: [QState] -> QState -> Int 
 getIndex list state = case (List.elemIndex state list) of 
                         Nothing -> -1 
                         Just a -> a   
 
+-- takes a dfa and updates states to be numbered in ascending order from 0 
 updateStateSet :: DFA -> DFA
 updateStateSet d = let states = Set.toAscList $ dstates d
                        statemap = updateState states where
@@ -279,7 +287,8 @@ updateStateSet d = let states = Set.toAscList $ dstates d
                                 $ Map.toList $ dtransition d, 
                                  dalphabet = dalphabet d }
                    
-
+-- takes a dfa and the list of states of the dfa and deletes
+-- all that are unreachable for any transition 
 deleteUnreachable :: DFA -> [QState] -> DFA
 deleteUnreachable d [] = d
 deleteUnreachable d @states(x:xs) = 
@@ -299,6 +308,7 @@ testDeleteUnreachable = "Unreachable states deleted from resulting DFA" ~:
   ]
 
 
+-- delete any (QState, Char) pair where QState is k 
 deleteKey :: QState -> [((QState, Char), QState)] -> [((QState, Char), QState)] 
 deleteKey k translist = List.filter (\((a,b),c) -> not (a == k)) translist 
 
@@ -310,6 +320,8 @@ testDeleteKey = "Deletes matching keys" ~:
     deleteKey 3 [((2,'a'),4),((3,'a'),2)] ~?= [((2,'a'),4)]
   ]
 
+-- takes a state and a transition mapping and returns bool indicating
+-- whether any transitions lead to this state  
 inwardTransition :: QState -> Dtransition -> Bool 
 inwardTransition s transmap = elem s (Map.elems $ Map.filterWithKey (\(k,_) _ -> k /= s) transmap) 
 
@@ -326,6 +338,7 @@ testInwardTransition = "Identifies inward transition correctly" ~:
     inwardTransition 3 (Map.fromList [((2,'0'),5),((2,'1'),4)]) ~?= False
   ]
 
+-- takes a list of states and returns a list of all unique state pairs 
 allPairs :: [QState] -> [(QState,QState)]
 allPairs states = [(s1,s2) | s1 <- states, s2 <- states, s1 < s2]
 
@@ -338,6 +351,8 @@ testAllPairs = "Returns all unique pairs in list" ~:
     allPairs [] ~?= []
   ]
 
+-- iterates through all unique pairs of states and merges indistinguishable pairs
+-- in dfa 
 mergePair :: DFA -> [(QState,QState)] -> DFA
 mergePair d [] = d 
 mergePair d (x:xs) =  let newd = mergeIndistinct d (fst x) (snd x) in
@@ -345,10 +360,12 @@ mergePair d (x:xs) =  let newd = mergeIndistinct d (fst x) (snd x) in
                           then mergePair d xs -- try next pair in dfa d
                           else mergePair newd $ allPairs $ Set.toList $ dstates newd
 
+-- takes two states and a list of transitions and outward transitions of s2 to s1 
 addOutward :: QState -> QState-> [((QState, Char), QState)] -> [((QState, Char), QState)] 
 addOutward s1 s2 translist = translist ++ (List.map (\((a,b),c) -> ((a,b),s1)) $
                             List.filter (\((a,b),c) -> (c == s2)) translist) 
 
+-- takes a dfa and two states and merges states if they are indistinct
 mergeIndistinct :: DFA -> QState -> QState -> DFA
 mergeIndistinct d x1 x2 = if indistinct d x1 x2 
                           then  DFA {dstart = dstart d,
