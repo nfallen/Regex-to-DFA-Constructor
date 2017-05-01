@@ -356,6 +356,8 @@ testMergeIndistinct = "Merges indistinct states" ~:
                  dalphabet = NonEmpty.fromList "01"}  
   ]
 
+
+
 indistinct :: DFA -> QState -> QState -> Bool
 indistinct d1 s1 s2 = 
   let accepts = daccept d1 in
@@ -387,6 +389,9 @@ nullable (Alt r1 r2) = nullable r1 || nullable r2
 nullable (Seq r1 r2) = nullable r1 && nullable r2
 nullable _           = False
 
+nu :: RegExp -> RegExp
+nu r = if nullable r then Empty else Void
+
 -- |  Takes a regular expression `r` and a character `c`,
 -- and computes a new regular expression that accepts word `w` if `cw` is
 -- accepted by `r`.
@@ -398,10 +403,11 @@ deriv (Alt r1 Empty) c       = deriv r1 c
 deriv (Alt r1 r2) c          = rAlt (deriv r1 c) (deriv r2 c)
 deriv (Seq Empty r2) c       = deriv r2 c
 deriv (Seq r1 Empty) c       = deriv r1 c
-deriv (Seq r1 r2) c          = let d = deriv r1 c `rSeq` r2 in
-                               if nullable r1
-                               then rAlt d (deriv r2 c)
-                               else d
+deriv (Seq r1 r2) c          = let d = deriv r1 c in
+                               if nullable r1 then
+                                (d `rSeq` r2) `rAlt` (deriv r2 c)
+                               else
+                                (d `rSeq` r2)
 deriv (Star r) c             = deriv r c `rSeq` rStar r
 deriv Void _ = Void
 
@@ -410,7 +416,11 @@ testDeriv = "test computing regex derivatives" ~:
   TestList [
     deriv (rSeq (rAlt (rChar "1") Empty) (rChar "0")) '0' ~?= Empty,
     deriv (rSeq (rStar (rChar "1")) (rChar "0")) '0' ~?= Empty,
-    deriv (rSeq (rChar "1") (rChar "0")) '0' ~?= Void
+    deriv (rSeq (rChar "1") (rChar "0")) '0' ~?= Void,
+    deriv (rSeq (rStar (rChar "1")) (rStar (rChar "0"))) '1' ~?=
+      rSeq (rStar (rChar "1")) (rStar (rChar "0")),
+    deriv (rStar (rSeq (rChar "0") (rStar (rChar "0")))) '0' ~?=
+      (rSeq (rStar (rChar "0")) (rStar (rSeq (rChar "0") (rStar (rChar "0")))))
   ]
 
 brzozowskiStateConstruction :: Alpha -> Maybe RegExp -> State (DFASt (RegExp)) ()

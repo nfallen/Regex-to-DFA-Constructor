@@ -33,7 +33,8 @@ sigmaStarDfa :: Alpha -> DFA
 sigmaStarDfa ab = DFA {dstart = 0, 
                        dstates = Set.singleton 0,
                        daccept = Set.singleton 0,
-                       dtransition = Map.empty,
+                       dtransition = Map.fromList $
+                                        [((0,s),0) | s <- NonEmpty.toList ab],
                        dalphabet = ab}
 
 -- DFA that rejects all strings
@@ -49,7 +50,9 @@ emptyStringDfa :: Alpha -> DFA
 emptyStringDfa ab = DFA {dstart = 0, 
                          dstates = Set.fromList [0,1],
                          daccept = Set.singleton 0,
-                         dtransition = Map.fromList [((0,s),1) | s <- NonEmpty.toList ab],
+                         dtransition = Map.fromList $
+                                        [((0,s),1) | s <- NonEmpty.toList ab] 
+                                        ++ [((1,s),1) | s <- NonEmpty.toList ab],
                          dalphabet = ab}
 
 -- DFAs for testing purposes

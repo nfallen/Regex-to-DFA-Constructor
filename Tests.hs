@@ -27,7 +27,7 @@ import Test.QuickCheck.Function
 import Debug.Trace
 
 chars, validDotComMail :: RegExp
-chars           = [regex|[0-9]|]
+chars           = [regex|[0123]|]
 validDotComMail = [regex|${plus chars}@${plus chars}.com|]
  
 plus :: RegExp -> RegExp
@@ -43,8 +43,22 @@ testBrzozowskiConstruction = "brzozowski construction" ~:
                dstates = Set.singleton 0,
                daccept = Set.singleton 0,
                dtransition = Map.fromList [((0,'a'),0)],
-               dalphabet = return 'a'}
-  ]
+               dalphabet = return 'a'},
+    brzozowskiConstruction (rSeq (rStar (rChar "1")) (rStar (rChar "1")))
+      ~?= DFA {dstart = 0,
+               dstates = Set.fromList [0], 
+               daccept = Set.fromList [0],
+               dtransition = Map.fromList [((0,'1'),0)], 
+               dalphabet = return '1'},
+    brzozowskiConstruction (rSeq (rStar (rChar "01")) (rChar "01"))
+      ~?= DFA {dstart = 0,
+               dstates = Set.fromList [0,1], 
+               daccept = Set.fromList [1], 
+               dtransition = Map.fromList [((0,'0'),1),
+                                           ((0,'1'),1),
+                                           ((1,'0'),1),
+                                           ((1,'1'),1)],
+               dalphabet = NonEmpty.fromList "01"}]
 
 testThompsonConstruction :: Test
 testThompsonConstruction = 
@@ -64,18 +78,27 @@ testThompsonConstruction =
 testConstructionsIsomorphic :: Test
 testConstructionsIsomorphic = 
   TestList [
+    thompsonConstruction Empty ~?= brzozowskiConstruction Empty,
+    thompsonConstruction [regex|(0|1)*|]
+      ~?= brzozowskiConstruction [regex|(0|1)*|],
     thompsonConstruction (rAlt (rChar "a") (rChar "b")) 
       ~?= brzozowskiConstruction (rAlt (rChar "a") (rChar "b")),
     thompsonConstruction (rSeq (rChar "a") (rChar "b"))
       ~?= brzozowskiConstruction (rSeq (rChar "a") (rChar "b")),
     thompsonConstruction (rStar (rChar "a")) 
       ~?= brzozowskiConstruction (rStar (rChar "a")),
+    thompsonConstruction (rStar (rChar "abc")) 
+      ~?= brzozowskiConstruction (rStar (rChar "abc")),
     thompsonConstruction (rAlt (rChar "a") (rStar (rChar "b")))
       ~?= brzozowskiConstruction (rAlt (rChar "a") (rStar (rChar "b"))),
     thompsonConstruction (rSeq (rAlt (rChar "1") Empty) (rChar "0"))
       ~?= brzozowskiConstruction (rSeq (rAlt (rChar "1") Empty) (rChar "0")),
-    thompsonConstruction validDotComMail 
-      ~?= brzozowskiConstruction validDotComMail
+    thompsonConstruction (rSeq (rStar (rChar "1")) (rChar "0"))
+      ~?= brzozowskiConstruction (rSeq (rStar (rChar "1")) (rChar "0")),
+    thompsonConstruction (rStar (rSeq (rChar "0") (rStar (rChar "0"))))
+      ~?= brzozowskiConstruction (rStar (rSeq (rChar "0") (rStar (rChar "0")))),
+    thompsonConstruction (rSeq (rStar (rChar "01")) (rStar (rChar "0")))
+      ~?= brzozowskiConstruction (rSeq (rStar (rChar "01")) (rStar (rChar "0")))
   ]
 
 newtype ZOString = ZOString {str :: String} deriving (Show)
@@ -118,6 +141,9 @@ propNfaDfaAcceptSame regexp s = let thomNfa = thompsonNfaConstruction regexp in
 
 main :: IO ()
 main = do
+    DFA.main 
+    NFA.main 
+    Construction.main 
     runTestTT $ TestList [testBrzozowskiConstruction,
                           testThompsonConstruction,
                           testConstructionsIsomorphic]

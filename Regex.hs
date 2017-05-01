@@ -43,23 +43,55 @@ data RegExp = CharExp (NonEmpty Char)      -- single literal character
             | Empty                -- ε, accepts empty string
             | Void                 -- ∅, always fails
             | Var String           -- a variable holding another regexp
-  deriving (Show, Eq, Ord)
+  deriving (Eq, Ord)
+
+instance Show RegExp where
+  show (CharExp cs)   = "(rChar \"" ++ NonEmpty.toList cs ++ "\")"
+  show (AltExp r1 r2) = "(rAlt " ++ show r1 ++ " " ++ show r2 ++ ")"
+  show (SeqExp r1 r2) = "(rSeq " ++ show r1 ++ " " ++ show r2 ++ ")"
+  show (StarExp r)    = "(rStar " ++ show r ++ ")"
+  show Empty          = "Empty"
+  show Void           = "Void"
+  show (Var s)        = "(Var " ++ s ++ ")"
+
+orderedAlt :: RegExp -> RegExp -> RegExp
+orderedAlt r1 r2 = if r1 < r2 then AltExp r1 r2 else AltExp r2 r1
 
 rAlt :: RegExp -> RegExp -> RegExp
 rAlt Void x = x
 rAlt x Void = x
 rAlt (StarExp r) Empty = StarExp r
 rAlt Empty (StarExp r) = StarExp r
-rAlt r1 r2 -- keep ordering consistent so that regexes will pass equality checks
+rAlt r1@(StarExp s1) r2@(SeqExp p (StarExp s2)) = 
+  if (s1 == p && p == s2) then r1
+    else orderedAlt r1 r2
+rAlt r1@(SeqExp p (StarExp s1)) r2@(StarExp s2) = 
+  if (s1 == p && p == s2) then r2
+    else orderedAlt r1 r2
+rAlt r1 r2 
   | r1 == r2  = r1
-  | r1 < r2   = AltExp r1 r2
-  | otherwise = AltExp r2 r1
+  | otherwise = 
+    case (r1, r2) of
+      (AltExp a1 a2, _) -> 
+        if a1 == r2 || a2 == r2
+        then rAlt a1 a2
+        else orderedAlt r1 r2  
+      (_, AltExp a1 a2) -> 
+        if a1 == r1 || a2 == r1
+        then rAlt a1 a2
+        else orderedAlt (rAlt r1 a1) a2 
+      _ -> orderedAlt r1 r2
 
 rSeq :: RegExp -> RegExp -> RegExp
 rSeq Void _ = Void -- concatenating any string to void is void 
 rSeq _ Void = Void
 rSeq Empty x = x -- concatenating the empty string to any string is itself
 rSeq x Empty = x
+rSeq r1@(Star x) r2@(Star y) 
+  | x == y = rStar x 
+  | otherwise = SeqExp r1 r2
+rSeq r1@(Seq _ _) r2 = SeqExp r1 r2
+rSeq r1 r2@(Seq s1 s2) = SeqExp (SeqExp r1 s1) s2
 rSeq r1 r2 = SeqExp r1 r2
 
 rStar :: RegExp -> RegExp
@@ -97,11 +129,7 @@ regexParser = alts <* eof where
   singlechar = (rChar . (:[])) <$> noneOf specials
   charclass  = fmap rChar $
                  P.char '[' *> content <* P.char ']'
-  content    = try (concat <$> many1 range)
-                 P.<|> many1 (noneOf specials)
-  range      = enumFromTo
-                 <$> (noneOf specials <* P.char '-')
-                 <*> noneOf specials
+  content    = try $ P.many (noneOf specials)
   alts       = try (rAlt <$> seqs <*> (P.char '|' *> alts)) P.<|> seqs
   seqs       = try (rSeq <$> star <*> seqs) P.<|> star
   star       = try (rStar <$> (atom <* P.char '*'))
